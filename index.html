@@ -185,50 +185,57 @@
             var xFloat = (lon + 180) / 360 * n;
             var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
 
-var tileX = Math.floor(xFloat);
-var tileY = Math.floor(yFloat);
-var offX = (xFloat - tileX) * 256;
-var offY = (yFloat - tileY) * 256;
-var cx = w / 2;
-var cy = h / 2;
-var satHost = "https://" + "arcgisonline.com";
-var osmHost = "https://" + "tile.openstreetmap.org/";
-for (var dx = -1; dx <= 1; dx++) {
-for (var dy = -1; dy <= 1; dy++) {
-var img = document.createElement('img');
-var tx = tileX + dx;
-var ty = tileY + dy;
-if (isSat) {
-img.src = satHost + zoom + "/" + ty + "/" + tx;
-} else {
-img.src = osmHost + zoom + "/" + tx + "/" + ty + ".png";
-}
-img.style.position = "absolute";
-img.style.width = "256px";
-img.style.height = "256px";
-img.style.left = Math.round(cx - offX + dx * 256) + "px";
-img.style.top = Math.round(cy - offY + dy * 256) + "px";
-box.appendChild(img);
-}
-}
-}
-document.getElementById('zoomIn').addEventListener('click', function() {
-if (mapZoom < 19) {
-mapZoom++;
-uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
-}
-});
-document.getElementById('zoomOut').addEventListener('click', function() {
-if (mapZoom > 10) {
-mapZoom--;
-uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
-}
-});
-document.getElementById('layerBtn').addEventListener('click', function() {
-isSat = !isSat;
-uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
-});
-uyduCiz(38.3687, 34.0370, 12);
+            var tileX = Math.floor(xFloat);
+            var tileY = Math.floor(yFloat);
+            var offX = (xFloat - tileX) * 256;
+            var offY = (yFloat - tileY) * 256;
+
+            var cx = w / 2;
+            var cy = h / 2;
+
+            var proto = window.location.protocol + "//";
+            var esri = "server." + "arcgisonline." + "com/ArcGIS/rest/services/World_Imagery/MapServer/tile/";
+            var osm = "tile." + "openstreetmap." + "org/";
+
+            for (var dx = -1; dx <= 1; dx++) {
+                for (var dy = -1; dy <= 1; dy++) {
+                    var img = document.createElement('img');
+                    var tx = tileX + dx;
+                    var ty = tileY + dy;
+                    if (isSat) {
+                        img.src = proto + esri + zoom + "/" + ty + "/" + tx;
+                    } else {
+                        img.src = proto + osm + zoom + "/" + tx + "/" + ty + ".png";
+                    }
+                    img.style.position = "absolute";
+                    img.style.width = "256px";
+                    img.style.height = "256px";
+                    img.style.left = Math.round(cx - offX + dx * 256) + "px";
+                    img.style.top = Math.round(cy - offY + dy * 256) + "px";
+                    box.appendChild(img);
+                }
+            }
+        }
+
+        document.getElementById('zoomIn').addEventListener('click', function() {
+            if (mapZoom < 19) {
+                mapZoom++;
+                uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+            }
+        });
+        document.getElementById('zoomOut').addEventListener('click', function() {
+            if (mapZoom > 10) {
+                mapZoom--;
+                uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+            }
+        });
+        document.getElementById('layerBtn').addEventListener('click', function() {
+            isSat = !isSat;
+            uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+        });
+
+        uyduCiz(38.3687, 34.0370, 12);
+
 var db = null;
 var processedPhotoDataUrl = null;
 var allRecordsCache = new Array();
