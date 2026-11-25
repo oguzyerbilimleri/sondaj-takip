@@ -17,7 +17,7 @@
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
         .map-wrap { position: relative; height: 250px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
-        #tileLayer { position: absolute; inset: 0; overflow: hidden; }
+        #tileLayer { position: absolute; inset: 0; z-index: 1; }
         .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
         .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
         .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
@@ -172,25 +172,37 @@
         konumAl();
     </script>
 
-       <!-- 2. BLOK: UYDU VE HARİTA -->
+           <!-- 2. BLOK: UYDU VE HARİTA -->
     <script>
         var mapZoom = 17;
         var isSat = true;
-        var lMap = L.map('tileLayer', { zoomControl: false }).setView([38.3687, 34.0370], 13);
-        var satLayer = L.tileLayer('https://arcgisonline.com{z}/{y}/{x}', { maxZoom: 19 }).addTo(lMap);
-        var osmLayer = L.tileLayer('https://openstreetmap.org{z}/{x}/{y}.png', { maxZoom: 19 });
+        var lMap = null;
+        var satLayer = null;
+        var osmLayer = null;
 
-        function uyduCiz(lat, lon, zoom) {
-            lMap.setView([lat, lon], zoom);
+        if (typeof L !== 'undefined') {
+            lMap = L.map('tileLayer', { zoomControl: false }).setView([38.3687, 34.0370], 13);
+            satLayer = L.tileLayer('https://arcgisonline.com{z}/{y}/{x}', { maxZoom: 19 }).addTo(lMap);
+            osmLayer = L.tileLayer('https://openstreetmap.org{z}/{x}/{y}.png', { maxZoom: 19 });
+            setTimeout(function() { lMap.invalidateSize(); }, 400);
         }
 
-        document.getElementById('zoomIn').addEventListener('click', function() { lMap.zoomIn(); });
-        document.getElementById('zoomOut').addEventListener('click', function() { lMap.zoomOut(); });
+        function uyduCiz(lat, lon, zoom) {
+            if (lMap) {
+                lMap.invalidateSize();
+                lMap.setView([lat, lon], zoom);
+            }
+        }
+
+        document.getElementById('zoomIn').addEventListener('click', function() { if (lMap) lMap.zoomIn(); });
+        document.getElementById('zoomOut').addEventListener('click', function() { if (lMap) lMap.zoomOut(); });
         document.getElementById('layerBtn').addEventListener('click', function() {
+            if (!lMap) return;
             isSat = !isSat;
             if (isSat) { lMap.removeLayer(osmLayer); satLayer.addTo(lMap); }
             else { lMap.removeLayer(satLayer); osmLayer.addTo(lMap); }
         });
+
 
         uyduCiz(38.3687, 34.0370, 12);
 
