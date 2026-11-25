@@ -4,113 +4,115 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zemin Etüt - Saha Sondaj Kayıt</title>
-    <script src="https://tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <script src="https://unpkg.com"></script>
+    <link rel="stylesheet" href="https://cloudflare.com" />
+    <script src="https://cloudflare.com"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        #map { height: 250px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #0f172a; color: #f1f5f9; padding-bottom: 60px; }
+        header { background: #f59e0b; color: #020617; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 999; }
+        header h1 { font-size: 18px; font-weight: 800; }
+        header p { font-size: 11px; opacity: 0.85; }
+        .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
+        main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
+        #map { height: 240px; width: 100%; border-radius: 8px; background: #0f172a; }
+        .gps-box { margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .gps-info { font-size: 12px; line-height: 1.6; color: #94a3b8; }
+        .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; }
+        .gps-acc { color: #34d399; font-family: monospace; font-weight: 700; }
+        #gpsStatus { font-size: 11px; color: #38bdf8; margin-top: 2px; font-weight: 600; }
+        .btn-gps { background: #f59e0b; color: #020617; border: none; padding: 10px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        h2 { font-size: 13px; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .field { margin-bottom: 10px; }
+        label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        input[type="text"], input[type="number"] { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
+        input[type="file"] { width: 100%; font-size: 12px; color: #cbd5e1; }
+        #previewImg { display: none; width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #475569; }
+        .btn-save { width: 100%; background: #059669; color: #fff; border: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+        .rec-item { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; display: flex; gap: 10px; margin-bottom: 10px; }
+        .rec-img { width: 75px; height: 75px; object-fit: cover; border-radius: 8px; border: 1px solid #475569; flex-shrink: 0; }
+        .rec-body { flex: 1; font-size: 12px; line-height: 1.5; }
+        .rec-top { display: flex; justify-content: space-between; font-weight: 700; color: #fbbf24; }
+        .btn-del { background: none; border: none; color: #f87171; font-weight: 700; font-size: 12px; cursor: pointer; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 pb-20">
+<body>
 
-    <header class="bg-amber-500 text-slate-950 p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
+    <header>
         <div>
-            <h1 class="font-bold text-lg leading-tight">Saha Sondaj Takip v2</h1>
-            <p class="text-xs font-medium opacity-80">Zemin Etüt Veri Toplama</p>
+            <h1>Saha Sondaj Takip</h1>
+            <p>Zemin Etüt Veri Toplama</p>
         </div>
-        <button type="button" onclick="exportCSV()" class="bg-slate-900 text-amber-400 text-xs font-bold px-3 py-2 rounded-lg shadow">
-            Excel (CSV) İndir
-        </button>
+        <button type="button" class="btn-csv" onclick="exportCSV()">Excel (CSV) İndir</button>
     </header>
 
-    <main class="p-4 max-w-lg mx-auto space-y-4">
-
-        <!-- Harita ve GPS Durumu -->
-        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow">
+    <main>
+        <div class="card">
             <div id="map"></div>
-            <div class="mt-3 flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700 gap-2">
-                <div class="text-xs space-y-1">
-                    <div class="text-slate-400">Enlem (Lat): <span id="latVal" class="text-amber-400 font-mono font-bold">-</span></div>
-                    <div class="text-slate-400">Boylam (Lon): <span id="lonVal" class="text-amber-400 font-mono font-bold">-</span></div>
-                    <div class="text-slate-400">GPS Hassasiyeti: <span id="accVal" class="text-emerald-400 font-mono">-</span></div>
-                    <div id="gpsStatus" class="text-[11px] text-amber-300 font-medium">Hazır - Konum isteniyor...</div>
+            <div class="gps-box">
+                <div class="gps-info">
+                    <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
+                    <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
+                    <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
+                    <div id="gpsStatus">Konum bekleniyor...</div>
                 </div>
-                <button type="button" onclick="konumAl()" class="bg-amber-500 active:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-2.5 rounded-lg shrink-0">
-                    Konum Al
-                </button>
+                <button type="button" class="btn-gps" onclick="konumAl()">Konum Al</button>
             </div>
         </div>
 
-        <!-- Yeni Sondaj Formu -->
-        <form id="boreholeForm" class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 shadow">
-            <h2 class="font-bold text-amber-400 text-sm uppercase tracking-wider">Yeni Sondaj Noktası Ekle</h2>
-            
-            <div class="grid grid-cols-2 gap-3">
+        <form id="boreholeForm" class="card">
+            <h2>Yeni Sondaj Noktası Ekle</h2>
+            <div class="row">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Ada / Parsel</label>
-                    <input type="text" id="parcel" required placeholder="Örn: 104 / 12" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm">
+                    <label>Ada / Parsel</label>
+                    <input type="text" id="parcel" required placeholder="Örn: 104 / 12">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Sondaj No</label>
-                    <input type="text" id="skNo" required placeholder="Örn: SK-1" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm">
+                    <label>Sondaj No</label>
+                    <input type="text" id="skNo" required placeholder="Örn: SK-1">
                 </div>
             </div>
-
-            <div class="grid grid-cols-2 gap-3">
+            <div class="row">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Derinlik (m)</label>
-                    <input type="number" step="0.5" id="depth" placeholder="Örn: 15" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm">
+                    <label>Derinlik (m)</label>
+                    <input type="number" step="0.5" id="depth" placeholder="Örn: 15">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Yeraltı Suyu (m)</label>
-                    <input type="number" step="0.1" id="waterLevel" placeholder="Yoksa boş" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm">
+                    <label>Yeraltı Suyu (m)</label>
+                    <input type="number" step="0.1" id="waterLevel" placeholder="Yoksa boş">
                 </div>
             </div>
-
-            <div>
-                <label class="block text-xs text-slate-400 mb-1">Saha Notu</label>
-                <input type="text" id="notes" placeholder="Zemin cinsi, karot durumu vb." class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm">
+            <div class="field">
+                <label>Saha Notu</label>
+                <input type="text" id="notes" placeholder="Zemin cinsi, karot durumu vb.">
             </div>
-
-            <div>
-                <label class="block text-xs text-slate-400 mb-1">Sondaj Fotoğrafı</label>
-                <input type="file" id="photoInput" accept="image/*" capture="environment" class="block w-full text-xs text-slate-300 file:mr-3 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-700 file:text-amber-400">
-                <img id="previewImg" class="hidden mt-2 rounded-lg max-h-48 w-full object-cover border border-slate-600" />
+            <div class="field">
+                <label>Sondaj Fotoğrafı (Otomatik Koordinat Basılır)</label>
+                <input type="file" id="photoInput" accept="image/*" capture="environment">
+                <img id="previewImg" />
             </div>
-
-            <button type="submit" class="w-full bg-emerald-600 active:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm shadow-lg">
-                Sondajı Kaydet
-            </button>
+            <button type="submit" class="btn-save">Sondajı Kaydet</button>
         </form>
 
-        <!-- Kayıtlı Sondajlar -->
-        <div class="space-y-2">
-            <h2 class="font-bold text-slate-300 text-sm uppercase tracking-wider px-1">Kayıtlı Sondajlar (<span id="count">0</span>)</h2>
-            <div id="recordsList" class="space-y-3"></div>
+        <div>
+            <h2>Kayıtlı Sondajlar (<span id="count">0</span>)</h2>
+            <div id="recordsList"></div>
         </div>
-
     </main>
 
-    <canvas id="watermarkCanvas" class="hidden"></canvas>
+    <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
     <script>
-        window.onerror = function(msg, url, line) {
-            document.getElementById('gpsStatus').innerText = "Kod Hatası (Satır " + line + "): " + msg;
-        };
-
         var currentLat = null, currentLon = null, currentAcc = null;
         var map = null, marker = null, db = null;
         var processedPhotoDataUrl = null;
 
-        // Harita Kurulumu
-        try {
+        if (typeof L !== 'undefined') {
             map = L.map('map').setView([38.3687, 34.0370], 11);
             L.tileLayer('https://arcgisonline.com{z}/{y}/{x}', {
                 attribution: 'Esri'
             }).addTo(map);
-        } catch (e) {
-            document.getElementById('gpsStatus').innerText = "Harita yüklenemedi: " + e.message;
         }
 
         function konumAl() {
@@ -119,7 +121,8 @@
                 statusEl.innerText = "Tarayıcı konum desteklemiyor.";
                 return;
             }
-            statusEl.innerText = "Konum sorgulanıyor...";
+            statusEl.innerText = "Uyduya bağlanılıyor...";
+            statusEl.style.color = "#fbbf24";
 
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
@@ -131,7 +134,7 @@
                     document.getElementById('lonVal').innerText = currentLon;
                     document.getElementById('accVal').innerText = currentAcc;
                     statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
-                    statusEl.className = "text-[11px] text-emerald-400 font-bold";
+                    statusEl.style.color = "#34d399";
 
                     if (map) {
                         var ll = [parseFloat(currentLat), parseFloat(currentLon)];
@@ -142,16 +145,14 @@
                 },
                 function(err) {
                     statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-                    statusEl.className = "text-[11px] text-rose-400 font-bold";
+                    statusEl.style.color = "#f87171";
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         }
 
-        // Sayfa açılınca otomatik konum al
         konumAl();
 
-        // Fotoğraf ve Filigran
         document.getElementById('photoInput').addEventListener('change', function(e) {
             var file = e.target.files;
             if (!file) return;
@@ -185,20 +186,18 @@
                     var dateStr = new Date().toLocaleString('tr-TR');
                     var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
 
-                    ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
-
-                    processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    var preview = document.getElementById('previewImg');
-                    preview.src = processedPhotoDataUrl;
-preview.classList.remove('hidden');
+ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
+ctx.fillStyle = "#ffffff";
+ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
+processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+var preview = document.getElementById('previewImg');
+preview.src = processedPhotoDataUrl;
+preview.style.display = "block";
 };
 img.src = event.target.result;
 };
 reader.readAsDataURL(file);
 });
-// IndexedDB Veritabanı
 var reqDB = indexedDB.open("ZeminEtutDB", 1);
 reqDB.onupgradeneeded = function(e) {
 db = e.target.result;
@@ -208,7 +207,6 @@ reqDB.onsuccess = function(e) {
 db = e.target.result;
 renderRecords();
 };
-// Kaydetme
 document.getElementById('boreholeForm').addEventListener('submit', function(e) {
 e.preventDefault();
 if (!currentLat) {
@@ -231,7 +229,7 @@ var tx = db.transaction("sondajlar", "readwrite");
 tx.objectStore("sondajlar").add(record);
 tx.oncomplete = function() {
 document.getElementById('boreholeForm').reset();
-document.getElementById('previewImg').classList.add('hidden');
+document.getElementById('previewImg').style.display = "none";
 processedPhotoDataUrl = null;
 renderRecords();
 alert("Sondaj kaydedildi!");
@@ -247,7 +245,7 @@ document.getElementById('count').innerText = records.length;
 list.innerHTML = "";
 records.forEach(function(r) {
 var card = document.createElement('div');
-card.className = "bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-3 items-start";
+card.className = "rec-item";
 var imgHtml = r.photo
 ? ''
 : 'Foto Yok';
