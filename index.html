@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zemin Etüt - Saha Sondaj Kayıt</title>
-    <link rel="stylesheet" href="https://cloudflare.com" />
-    <script src="https://cloudflare.com"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: #0f172a; color: #f1f5f9; padding-bottom: 60px; }
@@ -15,7 +13,7 @@
         .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-        #map { height: 240px; width: 100%; border-radius: 8px; background: #0f172a; }
+        #mapFrame { height: 250px; width: 100%; border: none; border-radius: 8px; background: #0f172a; display: block; }
         .gps-box { margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 12px; line-height: 1.6; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; }
@@ -49,7 +47,7 @@
 
     <main>
         <div class="card">
-            <div id="map"></div>
+            <iframe id="mapFrame" src="https://google.com" loading="lazy"></iframe>
             <div class="gps-box">
                 <div class="gps-info">
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
@@ -107,18 +105,6 @@
         var currentLat = null;
         var currentLon = null;
         var currentAcc = null;
-        var map = null;
-        var marker = null;
-
-                if (typeof L !== 'undefined') {
-            map = L.map('map').setView([38.3687, 34.0370], 12);
-            L.tileLayer('https://google.com{x}&y={y}&z={z}', {
-                maxZoom: 21,
-                attribution: 'Google Uydu'
-            }).addTo(map);
-            setTimeout(function() { map.invalidateSize(); }, 500);
-        }
-
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -133,15 +119,9 @@
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
 
-            if (map) {
-                var ll = [parseFloat(currentLat), parseFloat(currentLon)];
-                map.setView(ll, 18);
-                if (marker) {
-                    marker.setLatLng(ll);
-                } else {
-                    marker = L.marker(ll).addTo(map);
-                }
-            }
+            // Doğrudan Google Uydu Haritasını konuma odakla ve kırmızı pin koy
+            var mapUrl = "https://google.com" + currentLat + "," + currentLon + "&t=k&z=18&output=embed";
+            document.getElementById('mapFrame').src = mapUrl;
         }
 
         function konumAl() {
@@ -204,13 +184,15 @@
 
                     var barH = Math.max(60, h * 0.08);
                     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-ctx.fillRect(0, h - barH, w, barH);
-ctx.fillStyle = "#fbbf24";
-var fSize = Math.max(16, Math.round(w * 0.025));
-ctx.font = "bold " + fSize + "px sans-serif";
-var sk = document.getElementById('skNo').value || "Sondaj";
-var parcel = document.getElementById('parcel').value || "-";
-var dateStr = new Date().toLocaleString('tr-TR');
+                    ctx.fillRect(0, h - barH, w, barH);
+
+                    ctx.fillStyle = "#fbbf24";
+                    var fSize = Math.max(16, Math.round(w * 0.025));
+                    ctx.font = "bold " + fSize + "px sans-serif";
+                    
+                    var sk = document.getElementById('skNo').value || "Sondaj";
+                    var parcel = document.getElementById('parcel').value || "-";
+                    var dateStr = new Date().toLocaleString('tr-TR');
 var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
 ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
 ctx.fillStyle = "#ffffff";
