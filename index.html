@@ -68,7 +68,7 @@
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
                     <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
                     <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
-                    <div id="gpsStatus">Konum bekleniyor...</div>
+                    <div id="gpsStatus">Sistem başlatılıyor...</div>
                 </div>
                 <button type="button" class="btn-gps" id="gpsBtn">Konum Al</button>
             </div>
@@ -123,16 +123,13 @@
         var currentAcc = null;
         var mapZoom = 17;
         var isSat = true;
+        var proto = window.location.protocol + "//";
 
         function getTileUrl(x, y, z) {
-            var p = String.fromCharCode(104,116,116,112,115,58,47,47);
             if (isSat) {
-                var d = ["mt1","google","com"].join(".");
-                return p + d + "/vt/lyrs=y&x=" + x + "&y=" + y + "&z=" + z;
-            } else {
-                var o = ["tile","openstreetmap","org"].join(".");
-                return p + o + "/" + z + "/" + x + "/" + y + ".png";
+                return proto + "://google.com" + x + "&y=" + y + "&z=" + z;
             }
+            return proto + "tile.openstreetmap.org/" + z + "/" + x + "/" + y + ".png";
         }
 
         function renderTiles(lat, lon, zoom) {
@@ -172,8 +169,8 @@
             if (mapZoom < 20) { mapZoom++; renderTiles(currentLat, currentLon, mapZoom); }
         });
         document.getElementById('zoomOut').addEventListener('click', function() {
-if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
-});
+            if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
+        });
 document.getElementById('layerBtn').addEventListener('click', function() {
 isSat = !isSat;
 renderTiles(currentLat, currentLon, mapZoom);
@@ -190,9 +187,7 @@ document.getElementById('accVal').innerText = currentAcc;
 var statusEl = document.getElementById('gpsStatus');
 statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
 statusEl.style.color = "#34d399";
-var p = String.fromCharCode(104,116,116,112,115,58,47,47);
-var g = ["www","google","com"].join(".");
-document.getElementById('extMapLink').href = p + g + "/maps/search/?api=1&query=" + currentLat + "," + currentLon;
+document.getElementById('extMapLink').href = proto + "google.com" + currentLat + "," + currentLon;
 renderTiles(currentLat, currentLon, mapZoom);
 }
 function konumAl() {
