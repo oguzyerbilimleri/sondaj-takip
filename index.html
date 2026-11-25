@@ -13,18 +13,14 @@
         .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-        .map-wrap { position: relative; height: 240px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; }
-        #tileLayer { position: absolute; inset: 0; overflow: hidden; }
-        .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
-        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
-        .z-btn { width: 34px; height: 34px; background: rgba(15, 23, 42, 0.85); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
-        .maps-btn { position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.9); color: #38bdf8; border: 1px solid #334155; font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer; z-index: 20; }
+        .radar-box { position: relative; height: 220px; width: 100%; border-radius: 8px; background: radial-gradient(circle, #1e293b 0%, #090d16 100%); border: 1px solid #334155; overflow: hidden; }
+        #radarCanvas { width: 100%; height: 100%; display: block; }
         .gps-box { margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .gps-info { font-size: 12px; line-height: 1.6; color: #94a3b8; }
-        .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; }
+        .gps-info { font-size: 13px; line-height: 1.6; color: #94a3b8; }
+        .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
         .gps-acc { color: #34d399; font-family: monospace; font-weight: 700; }
-        #gpsStatus { font-size: 11px; color: #38bdf8; margin-top: 2px; font-weight: 600; }
-        .btn-gps { background: #f59e0b; color: #020617; border: none; padding: 10px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        #gpsStatus { font-size: 11px; color: #38bdf8; margin-top: 3px; font-weight: 600; }
+        .btn-gps { background: #f59e0b; color: #020617; border: none; padding: 12px 14px; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; white-space: nowrap; }
         h2 { font-size: 13px; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .field { margin-bottom: 10px; }
@@ -52,21 +48,15 @@
 
     <main>
         <div class="card">
-            <div class="map-wrap">
-                <div id="tileLayer"></div>
-                <div class="pin-center"></div>
-                <div class="zoom-btns">
-                    <button type="button" class="z-btn" id="zoomIn">+</button>
-                    <button type="button" class="z-btn" id="zoomOut">−</button>
-                </div>
-                <button type="button" id="extMapBtn" class="maps-btn">Google Haritalarda Aç ↗</button>
+            <div class="radar-box">
+                <canvas id="radarCanvas"></canvas>
             </div>
             <div class="gps-box">
                 <div class="gps-info">
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
                     <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
                     <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
-                    <div id="gpsStatus">Konum bekleniyor...</div>
+                    <div id="gpsStatus">Hazır - Konum alınıyor...</div>
                 </div>
                 <button type="button" class="btn-gps" id="gpsBtn">Konum Al</button>
             </div>
@@ -115,27 +105,87 @@
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
     <script>
-        var currentLat = 38.368700;
-        var currentLon = 34.037000;
-        var hasRealGPS = false;
+        var currentLat = null;
+        var currentLon = null;
         var currentAcc = null;
-        var mapZoom = 16;
+        var db = null;
+        var processedPhotoDataUrl = null;
+        var allRecordsCache = [];
+
+        function drawRadar(records) {
+            var c = document.getElementById('radarCanvas');
+            c.width = c.parentElement.clientWidth || 360;
+            c.height = c.parentElement.clientHeight || 220;
+            var ctx = c.getContext('2d');
+            var cx = c.width / 2;
+            var cy = c.height / 2;
+
+            ctx.clearRect(0, 0, c.width, c.height);
+            ctx.strokeStyle = "#334155";
+            ctx.lineWidth = 1;
+            [35, 70, 105].forEach(function(r) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+            ctx.beginPath();
+            ctx.moveTo(0, cy); ctx.lineTo(c.width, cy);
+            ctx.moveTo(cx, 0); ctx.lineTo(cx, c.height);
+            ctx.stroke();
+
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "bold 11px sans-serif";
+            ctx.fillText("K (N)", cx + 4, 14);
+
+            if (currentLat !== null) {
+                ctx.fillStyle = "#fbbf24";
+                ctx.font = "bold 12px monospace";
+                ctx.fillText(currentLat + ", " + currentLon, 10, 18);
+
+                if (records && records.length) {
+                    records.forEach(function(r) {
+                        var dLat = (parseFloat(r.lat) - parseFloat(currentLat)) * 111000;
+                        var dLon = (parseFloat(r.lon) - parseFloat(currentLon)) * 85000;
+                        var px = cx + Math.max(-140, Math.min(140, dLon * 1.5));
+                        var py = cy - Math.max(-90, Math.min(90, dLat * 1.5));
+                        ctx.beginPath();
+                        ctx.arc(px, py, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = "#38bdf8";
+                        ctx.fill();
+                        ctx.fillStyle = "#e2e8f0";
+                        ctx.font = "10px sans-serif";
+                        ctx.fillText(r.skNo, px + 7, py + 3);
+                    });
+                }
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+                ctx.fillStyle = "#ef4444";
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = "#64748b";
+                ctx.font = "12px sans-serif";
+                ctx.fillText("Konum bekleniyor...", cx - 55, cy - 12);
+            }
+        }
+        drawRadar([]);
 
         function ekranaKonumYaz(pos) {
-            currentLat = parseFloat(pos.coords.latitude.toFixed(6));
-            currentLon = parseFloat(pos.coords.longitude.toFixed(6));
-            hasRealGPS = true;
+            currentLat = pos.coords.latitude.toFixed(6);
+            currentLon = pos.coords.longitude.toFixed(6);
             currentAcc = Math.round(pos.coords.accuracy) + " m";
 
-            document.getElementById('latVal').innerText = currentLat.toFixed(6);
-            document.getElementById('lonVal').innerText = currentLon.toFixed(6);
+            document.getElementById('latVal').innerText = currentLat;
+            document.getElementById('lonVal').innerText = currentLon;
             document.getElementById('accVal').innerText = currentAcc;
 
             var statusEl = document.getElementById('gpsStatus');
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
-
-            renderTiles(currentLat, currentLon, mapZoom);
+            drawRadar(allRecordsCache);
         }
 
         function konumAl() {
@@ -146,81 +196,25 @@
                 return;
             }
             statusEl.innerText = "Konum sorgulanıyor...";
-            statusEl.style.color = "#fbbf24";
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function() {},
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-            );
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function(err) {
-                    if (!hasRealGPS) {
-                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-                        statusEl.style.color = "#f87171";
-                    }
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
-        }
-
-        document.getElementById('gpsBtn').addEventListener('click', konumAl);
-        konumAl();
-
-        document.getElementById('extMapBtn').addEventListener('click', function() {
-            var u = new URL(window.location.href);
-            u.protocol = "https:";
-            u.hostname = "://google.com";
-            u.pathname = "/maps";
-            u.search = "?q=" + currentLat + "," + currentLon;
-            window.open(u.toString(), "_blank");
-        });
-
-        function renderTiles(lat, lon, zoom) {
-            var box = document.getElementById('tileLayer');
-var w = box.clientWidth || 360;
-var h = box.clientHeight || 240;
-box.innerHTML = "";
-var n = Math.pow(2, zoom);
-var latRad = lat * Math.PI / 180;
-var xFloat = (lon + 180) / 360 * n;
-var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-var tileX = Math.floor(xFloat);
-var tileY = Math.floor(yFloat);
-var offX = (xFloat - tileX) * 256;
-var offY = (yFloat - tileY) * 256;
-var cx = w / 2;
-var cy = h / 2;
-for (var dx = -1; dx <= 1; dx++) {
-for (var dy = -1; dy <= 1; dy++) {
-var img = document.createElement('img');
-var u = new URL(window.location.href);
-u.protocol = "https:";
-u.hostname = "tile.openstreetmap.org";
-u.pathname = "/" + zoom + "/" + (tileX + dx) + "/" + (tileY + dy) + ".png";
-u.search = "";
-img.src = u.toString();
-img.style.position = "absolute";
-img.style.width = "256px";
-img.style.height = "256px";
-img.style.left = Math.round(cx - offX + dx * 256) + "px";
-img.style.top = Math.round(cy - offY + dy * 256) + "px";
-box.appendChild(img);
+statusEl.style.color = "#fbbf24";
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function() {},
+{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+);
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function(err) {
+if (!currentLat) {
+statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+statusEl.style.color = "#f87171";
 }
+},
+{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+);
 }
-}
-document.getElementById('zoomIn').addEventListener('click', function() {
-if (mapZoom < 19) { mapZoom++; renderTiles(currentLat, currentLon, mapZoom); }
-});
-document.getElementById('zoomOut').addEventListener('click', function() {
-if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
-});
-renderTiles(currentLat, currentLon, 13);
-var db = null;
-var processedPhotoDataUrl = null;
-var allRecordsCache = [];
+document.getElementById('gpsBtn').addEventListener('click', konumAl);
+konumAl();
 document.getElementById('photoInput').addEventListener('change', function(e) {
 var file = e.target.files.item(0);
 if (!file) return;
@@ -249,7 +243,7 @@ ctx.font = "bold " + fSize + "px sans-serif";
 var sk = document.getElementById('skNo').value || "Sondaj";
 var parcel = document.getElementById('parcel').value || "-";
 var dateStr = new Date().toLocaleString('tr-TR');
-var coordStr = hasRealGPS ? (currentLat.toFixed(6) + ", " + currentLon.toFixed(6)) : "Konum Yok";
+var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
 ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
 ctx.fillStyle = "#ffffff";
 ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
@@ -273,7 +267,7 @@ renderRecords();
 };
 document.getElementById('boreholeForm').addEventListener('submit', function(e) {
 e.preventDefault();
-if (!hasRealGPS) {
+if (!currentLat) {
 alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
 return;
 }
@@ -283,8 +277,8 @@ skNo: document.getElementById('skNo').value,
 depth: document.getElementById('depth').value,
 waterLevel: document.getElementById('waterLevel').value,
 notes: document.getElementById('notes').value,
-lat: currentLat.toFixed(6),
-lon: currentLon.toFixed(6),
+lat: currentLat,
+lon: currentLon,
 acc: currentAcc,
 date: new Date().toLocaleString('tr-TR'),
 photo: processedPhotoDataUrl
@@ -307,6 +301,7 @@ var list = document.getElementById('recordsList');
 allRecordsCache = e.target.result.reverse();
 document.getElementById('count').innerText = allRecordsCache.length;
 list.innerHTML = "";
+drawRadar(allRecordsCache);
 allRecordsCache.forEach(function(r, idx) {
 var card = document.createElement('div');
 card.className = "rec-item";
