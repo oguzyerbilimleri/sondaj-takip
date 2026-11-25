@@ -14,10 +14,12 @@
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
         .map-wrap { position: relative; height: 250px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; }
-        #satCanvas { width: 100%; height: 100%; display: block; }
-        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; }
+        #tileLayer { position: absolute; inset: 0; overflow: hidden; }
+        .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
+        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
         .z-btn { width: 34px; height: 34px; background: rgba(15, 23, 42, 0.85); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
-        .maps-link { position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); color: #38bdf8; text-decoration: none; font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 6px; border: 1px solid #334155; }
+        .layer-btn { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.85); color: #f1f5f9; border: 1px solid #475569; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 6px 9px; cursor: pointer; z-index: 20; }
+        .maps-link { position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); color: #38bdf8; text-decoration: none; font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 6px; border: 1px solid #334155; z-index: 20; }
         .gps-box { margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 12px; line-height: 1.6; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; }
@@ -52,7 +54,9 @@
     <main>
         <div class="card">
             <div class="map-wrap">
-                <canvas id="satCanvas"></canvas>
+                <div id="tileLayer"></div>
+                <div class="pin-center"></div>
+                <button type="button" class="layer-btn" id="layerBtn">Uydu / Harita</button>
                 <div class="zoom-btns">
                     <button type="button" class="z-btn" id="zoomIn">+</button>
                     <button type="button" class="z-btn" id="zoomOut">−</button>
@@ -64,7 +68,7 @@
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
                     <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
                     <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
-                    <div id="gpsStatus">Sistem başlatılıyor...</div>
+                    <div id="gpsStatus">Konum bekleniyor...</div>
                 </div>
                 <button type="button" class="btn-gps" id="gpsBtn">Konum Al</button>
             </div>
@@ -118,16 +122,24 @@
         var hasRealGPS = false;
         var currentAcc = null;
         var mapZoom = 17;
+        var isSat = true;
 
-        function drawSatelliteMap(lat, lon, zoom) {
-            var canvas = document.getElementById('satCanvas');
-            var rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width || 400;
-            canvas.height = rect.height || 250;
-            var ctx = canvas.getContext('2d');
+        function getTileUrl(x, y, z) {
+            var p = String.fromCharCode(104,116,116,112,115,58,47,47);
+            if (isSat) {
+                var d = ["mt1","google","com"].join(".");
+                return p + d + "/vt/lyrs=y&x=" + x + "&y=" + y + "&z=" + z;
+            } else {
+                var o = ["tile","openstreetmap","org"].join(".");
+                return p + o + "/" + z + "/" + x + "/" + y + ".png";
+            }
+        }
 
-            ctx.fillStyle = "#0f172a";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function renderTiles(lat, lon, zoom) {
+            var box = document.getElementById('tileLayer');
+            var w = box.clientWidth || 360;
+            var h = box.clientHeight || 250;
+            box.innerHTML = "";
 
             var n = Math.pow(2, zoom);
             var latRad = lat * Math.PI / 180;
@@ -136,56 +148,39 @@
 
             var tileX = Math.floor(xFloat);
             var tileY = Math.floor(yFloat);
-            var offsetX = (xFloat - tileX) * 256;
-            var offsetY = (yFloat - tileY) * 256;
+            var offX = (xFloat - tileX) * 256;
+            var offY = (yFloat - tileY) * 256;
 
-            var centerX = canvas.width / 2;
-            var centerY = canvas.height / 2;
-
-            var host = "https:" + "//" + "://google.com" + "/vt/lyrs=y";
+            var cx = w / 2;
+            var cy = h / 2;
 
             for (var dx = -1; dx <= 1; dx++) {
                 for (var dy = -1; dy <= 1; dy++) {
-                    (function(tx, ty, posX, posY) {
-                        var img = new Image();
-                        img.crossOrigin = "anonymous";
-                        img.onload = function() {
-                            ctx.drawImage(img, posX, posY, 256, 256);
-                            drawPin(ctx, centerX, centerY);
-                        };
-                        img.src = host + "&x=" + tx + "&y=" + ty + "&z=" + zoom;
-                    })(tileX + dx, tileY + dy, centerX - offsetX + dx * 256, centerY - offsetY + dy * 256);
+                    var img = document.createElement('img');
+                    img.src = getTileUrl(tileX + dx, tileY + dy, zoom);
+                    img.style.position = "absolute";
+                    img.style.width = "256px";
+                    img.style.height = "256px";
+                    img.style.left = Math.round(cx - offX + dx * 256) + "px";
+                    img.style.top = Math.round(cy - offY + dy * 256) + "px";
+                    box.appendChild(img);
                 }
             }
-            drawPin(ctx, centerX, centerY);
-        }
-
-        function drawPin(ctx, cx, cy) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, 14, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-            ctx.fillStyle = "#ef4444";
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#ffffff";
-            ctx.stroke();
         }
 
         document.getElementById('zoomIn').addEventListener('click', function() {
-            if (mapZoom < 20) { mapZoom++; drawSatelliteMap(currentLat, currentLon, mapZoom); }
+            if (mapZoom < 20) { mapZoom++; renderTiles(currentLat, currentLon, mapZoom); }
         });
         document.getElementById('zoomOut').addEventListener('click', function() {
-            if (mapZoom > 10) { mapZoom--; drawSatelliteMap(currentLat, currentLon, mapZoom); }
-        });
-
-        drawSatelliteMap(currentLat, currentLon, 13);
-
-        function ekranaKonumYaz(pos) {
-            currentLat = parseFloat(pos.coords.latitude.toFixed(6));
+if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
+});
+document.getElementById('layerBtn').addEventListener('click', function() {
+isSat = !isSat;
+renderTiles(currentLat, currentLon, mapZoom);
+});
+renderTiles(currentLat, currentLon, 13);
+function ekranaKonumYaz(pos) {
+currentLat = parseFloat(pos.coords.latitude.toFixed(6));
 currentLon = parseFloat(pos.coords.longitude.toFixed(6));
 hasRealGPS = true;
 currentAcc = Math.round(pos.coords.accuracy) + " m";
@@ -195,9 +190,10 @@ document.getElementById('accVal').innerText = currentAcc;
 var statusEl = document.getElementById('gpsStatus');
 statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
 statusEl.style.color = "#34d399";
-var gUrl = "https:" + "//" + "google.com" + "/maps/search/?api=1&query=" + currentLat + "," + currentLon;
-document.getElementById('extMapLink').href = gUrl;
-drawSatelliteMap(currentLat, currentLon, mapZoom);
+var p = String.fromCharCode(104,116,116,112,115,58,47,47);
+var g = ["www","google","com"].join(".");
+document.getElementById('extMapLink').href = p + g + "/maps/search/?api=1&query=" + currentLat + "," + currentLon;
+renderTiles(currentLat, currentLon, mapZoom);
 }
 function konumAl() {
 var statusEl = document.getElementById('gpsStatus');
