@@ -113,12 +113,11 @@
 
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
+    <!-- 1. BLOK: SADECE GPS (HARİTADAN BAĞIMSIZ) -->
     <script>
         var currentLat = null;
         var currentLon = null;
         var currentAcc = null;
-        var mapZoom = 17;
-        var isSat = true;
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -133,7 +132,9 @@
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
 
-            uyduCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom);
+            if (typeof uyduCiz === "function") {
+                uyduCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom);
+            }
         }
 
         function konumAl() {
@@ -166,6 +167,12 @@
 
         document.getElementById('gpsBtn').addEventListener('click', konumAl);
         konumAl();
+    </script>
+
+    <!-- 2. BLOK: UYDU VE HARİTA -->
+    <script>
+        var mapZoom = 17;
+        var isSat = true;
 
         function uyduCiz(lat, lon, zoom) {
             var box = document.getElementById('tileLayer');
@@ -178,14 +185,13 @@
             var xFloat = (lon + 180) / 360 * n;
             var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
 
-            var tileX = Math.floor(xFloat);
-            var tileY = Math.floor(yFloat);
-            var offX = (xFloat - tileX) * 256;
-            var offY = (yFloat - tileY) * 256;
-
+var tileX = Math.floor(xFloat);
+var tileY = Math.floor(yFloat);
+var offX = (xFloat - tileX) * 256;
+var offY = (yFloat - tileY) * 256;
 var cx = w / 2;
 var cy = h / 2;
-var satHost = "https://" + "://arcgisonline.com";
+var satHost = "https://" + "arcgisonline.com";
 var osmHost = "https://" + "tile.openstreetmap.org/";
 for (var dx = -1; dx <= 1; dx++) {
 for (var dy = -1; dy <= 1; dy++) {
