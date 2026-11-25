@@ -44,7 +44,7 @@
             <h1>Saha Sondaj Takip</h1>
             <p>Zemin Etüt Veri Toplama</p>
         </div>
-        <button type="button" class="btn-csv" onclick="exportCSV()">Excel (CSV) İndir</button>
+        <button type="button" class="btn-csv" id="csvBtn">Excel (CSV) İndir</button>
     </header>
 
     <main>
@@ -55,9 +55,9 @@
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
                     <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
                     <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
-                    <div id="gpsStatus">Konum bekleniyor...</div>
+                    <div id="gpsStatus">Sistem başlatılıyor...</div>
                 </div>
-                <button type="button" class="btn-gps" onclick="konumAl()">Konum Al</button>
+                <button type="button" class="btn-gps" id="gpsBtn">Konum Al</button>
             </div>
         </div>
 
@@ -104,9 +104,11 @@
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
     <script>
-        var currentLat = null, currentLon = null, currentAcc = null;
-        var map = null, marker = null, db = null;
-        var processedPhotoDataUrl = null;
+        var currentLat = null;
+        var currentLon = null;
+        var currentAcc = null;
+        var map = null;
+        var marker = null;
 
         if (typeof L !== 'undefined') {
             map = L.map('map').setView([38.3687, 34.0370], 11);
@@ -115,46 +117,69 @@
             }).addTo(map);
         }
 
+        function ekranaKonumYaz(pos) {
+            currentLat = pos.coords.latitude.toFixed(6);
+            currentLon = pos.coords.longitude.toFixed(6);
+            currentAcc = Math.round(pos.coords.accuracy) + " m";
+
+            document.getElementById('latVal').innerText = currentLat;
+            document.getElementById('lonVal').innerText = currentLon;
+            document.getElementById('accVal').innerText = currentAcc;
+
+            var statusEl = document.getElementById('gpsStatus');
+            statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
+            statusEl.style.color = "#34d399";
+
+            if (map) {
+                var ll = [parseFloat(currentLat), parseFloat(currentLon)];
+                map.setView(ll, 18);
+                if (marker) {
+                    marker.setLatLng(ll);
+                } else {
+                    marker = L.marker(ll).addTo(map);
+                }
+            }
+        }
+
         function konumAl() {
             var statusEl = document.getElementById('gpsStatus');
             if (!navigator.geolocation) {
                 statusEl.innerText = "Tarayıcı konum desteklemiyor.";
+                statusEl.style.color = "#f87171";
                 return;
             }
-            statusEl.innerText = "Uyduya bağlanılıyor...";
+            statusEl.innerText = "Konum sorgulanıyor...";
             statusEl.style.color = "#fbbf24";
 
             navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    currentLat = pos.coords.latitude.toFixed(6);
-                    currentLon = pos.coords.longitude.toFixed(6);
-                    currentAcc = Math.round(pos.coords.accuracy) + " m";
+                ekranaKonumYaz,
+                function() {},
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+            );
 
-                    document.getElementById('latVal').innerText = currentLat;
-                    document.getElementById('lonVal').innerText = currentLon;
-                    document.getElementById('accVal').innerText = currentAcc;
-                    statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
-                    statusEl.style.color = "#34d399";
-
-                    if (map) {
-                        var ll = [parseFloat(currentLat), parseFloat(currentLon)];
-                        map.setView(ll, 18);
-                        if (marker) marker.setLatLng(ll);
-                        else marker = L.marker(ll).addTo(map);
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function(err) {
+                    if (!currentLat) {
+                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+                        statusEl.style.color = "#f87171";
                     }
                 },
-                function(err) {
-                    statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-                    statusEl.style.color = "#f87171";
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
             );
         }
 
+        document.getElementById('gpsBtn').addEventListener('click', konumAl);
         konumAl();
+    </script>
+
+    <script>
+        var db = null;
+        var processedPhotoDataUrl = null;
+        var allRecordsCache = [];
 
         document.getElementById('photoInput').addEventListener('change', function(e) {
-            var file = e.target.files;
+            var file = e.target.files[0];
             if (!file) return;
 
             var reader = new FileReader();
@@ -164,7 +189,8 @@
                     var canvas = document.getElementById('watermarkCanvas');
                     var ctx = canvas.getContext('2d');
                     var maxDim = 1200;
-                    var w = img.width, h = img.height;
+                    var w = img.width;
+                    var h = img.height;
                     if (w > maxDim || h > maxDim) {
                         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
                         else { w = Math.round(w * maxDim / h); h = maxDim; }
@@ -175,17 +201,14 @@
 
                     var barH = Math.max(60, h * 0.08);
                     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                    ctx.fillRect(0, h - barH, w, barH);
-
-                    ctx.fillStyle = "#fbbf24";
-                    var fSize = Math.max(16, Math.round(w * 0.025));
-                    ctx.font = "bold " + fSize + "px sans-serif";
-                    
-                    var sk = document.getElementById('skNo').value || "Sondaj";
-                    var parcel = document.getElementById('parcel').value || "-";
-                    var dateStr = new Date().toLocaleString('tr-TR');
-                    var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
-
+ctx.fillRect(0, h - barH, w, barH);
+ctx.fillStyle = "#fbbf24";
+var fSize = Math.max(16, Math.round(w * 0.025));
+ctx.font = "bold " + fSize + "px sans-serif";
+var sk = document.getElementById('skNo').value || "Sondaj";
+var parcel = document.getElementById('parcel').value || "-";
+var dateStr = new Date().toLocaleString('tr-TR');
+var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
 ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
 ctx.fillStyle = "#ffffff";
 ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
@@ -240,10 +263,10 @@ if (!db) return;
 var tx = db.transaction("sondajlar", "readonly");
 tx.objectStore("sondajlar").getAll().onsuccess = function(e) {
 var list = document.getElementById('recordsList');
-var records = e.target.result.reverse();
-document.getElementById('count').innerText = records.length;
+allRecordsCache = e.target.result.reverse();
+document.getElementById('count').innerText = allRecordsCache.length;
 list.innerHTML = "";
-records.forEach(function(r) {
+allRecordsCache.forEach(function(r, idx) {
 var card = document.createElement('div');
 card.className = "rec-item";
 var imgHtml = r.photo
@@ -267,18 +290,22 @@ var tx = db.transaction("sondajlar", "readwrite");
 tx.objectStore("sondajlar").delete(id);
 tx.oncomplete = renderRecords;
 }
-function downloadPhoto(dataUrl, filename) {
+function downloadByIdx(idx) {
+var r = allRecordsCache[idx];
+if (!r || !r.photo) return;
 var a = document.createElement('a');
-a.href = dataUrl;
-a.download = filename.replace(/\s+/g, '_');
+a.href = r.photo;
+a.download = (r.parcel + "" + r.skNo + ".jpg").replace(/\s+/g, '');
 a.click();
 }
-function exportCSV() {
+document.getElementById('csvBtn').addEventListener('click', function() {
+if (!db) return;
 var tx = db.transaction("sondajlar", "readonly");
 tx.objectStore("sondajlar").getAll().onsuccess = function(e) {
 var records = e.target.result;
 if (!records.length) return alert("Kayıt yok.");
-var csv = "\uFEFFAda/Parsel;Sondaj No;Enlem;Boylam;Hassasiyet;Derinlik (m);YAS (m);Notlar;Tarih\n";
+var bom = String.fromCharCode(65279);
+var csv = bom + "Ada/Parsel;Sondaj No;Enlem;Boylam;Hassasiyet;Derinlik (m);YAS (m);Notlar;Tarih\n";
 records.forEach(function(r) {
 csv += '"' + r.parcel + '";"' + r.skNo + '";"' + r.lat + '";"' + r.lon + '";"' + r.acc + '";"' + r.depth + '";"' + r.waterLevel + '";"' + r.notes + '";"' + r.date + '"\n';
 });
@@ -288,4 +315,4 @@ a.href = URL.createObjectURL(blob);
 a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0,10) + ".csv";
 a.click();
 };
-}
+});
