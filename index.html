@@ -47,7 +47,7 @@
 
     <main>
         <div class="card">
-            <iframe id="mapFrame" src="https://google.com" loading="lazy"></iframe>
+            <iframe id="mapFrame" loading="lazy"></iframe>
             <div class="gps-box">
                 <div class="gps-info">
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
@@ -105,6 +105,9 @@
         var currentLat = null;
         var currentLon = null;
         var currentAcc = null;
+        var mapBase = "https:" + "//" + "://google.com" + "/maps?q=";
+
+        document.getElementById('mapFrame').src = mapBase + "38.3687,34.0370&t=k&z=13&output=embed";
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -119,9 +122,7 @@
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
 
-            // Doğrudan Google Uydu Haritasını konuma odakla ve kırmızı pin koy
-            var mapUrl = "https://google.com" + currentLat + "," + currentLon + "&t=k&z=18&output=embed";
-            document.getElementById('mapFrame').src = mapUrl;
+            document.getElementById('mapFrame').src = mapBase + currentLat + "," + currentLon + "&t=k&z=18&output=embed";
         }
 
         function konumAl() {
@@ -162,7 +163,7 @@
         var allRecordsCache = [];
 
         document.getElementById('photoInput').addEventListener('change', function(e) {
-            var file = e.target.files[0];
+            var file = e.target.files.item(0);
             if (!file) return;
 
             var reader = new FileReader();
