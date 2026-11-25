@@ -194,8 +194,9 @@
             var cy = h / 2;
 
             var proto = window.location.protocol + "//";
-            var esri = "server." + "arcgisonline." + "com/ArcGIS/rest/services/World_Imagery/MapServer/tile/";
-            var osm = "tile." + "openstreetmap." + "org/";
+            var esri = "server." + "arcgisonline." + "com" + "/ArcGIS/rest/services/" + "World_Imagery/MapServer/tile/";
+            var osm = "tile." + "openstreetmap." + "org" + "/";
+
 
             for (var dx = -1; dx <= 1; dx++) {
                 for (var dy = -1; dy <= 1; dy++) {
