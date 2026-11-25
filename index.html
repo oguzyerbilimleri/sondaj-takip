@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Zemin Etüt - Saha Sondaj Kayıt</title>
+    <script src="https://tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com" />
+    <script src="https://unpkg.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #map { height: 260px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 pb-20">
+
+    <header class="bg-amber-500 text-slate-950 p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
+        <div>
+            <h1 class="font-bold text-lg leading-tight">Saha Sondaj Takip</h1>
+            <p class="text-xs font-medium opacity-80">Zemin Etüt Veri Toplama</p>
+        </div>
+        <button onclick="exportCSV()" class="bg-slate-900 text-amber-400 text-xs font-bold px-3 py-2 rounded-lg shadow">
+            Excel (CSV) İndir
+        </button>
+    </header>
+
+    <main class="p-4 max-w-lg mx-auto space-y-4">
+
+        <!-- Harita ve GPS Durumu -->
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow">
+            <div id="map"></div>
+            <div class="mt-3 flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700">
+                <div class="text-xs space-y-1">
+                    <div class="text-slate-400">Enlem (Lat): <span id="latVal" class="text-amber-400 font-mono font-bold">Bekleniyor...</span></div>
+                    <div class="text-slate-400">Boylam (Lon): <span id="lonVal" class="text-amber-400 font-mono font-bold">Bekleniyor...</span></div>
+                    <div class="text-slate-400">GPS Hassasiyeti: <span id="accVal" class="text-emerald-400 font-mono">-</span></div>
+                    <div id="gpsStatus" class="text-[11px] text-sky-400 font-medium">Uydu bağlantısı başlatılıyor...</div>
+                </div>
+                <button onclick="startGPS(true)" class="bg-amber-500 active:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-2.5 rounded-lg shrink-0">
+                    Konumu Yenile
+                </button>
+            </div>
+        </div>
+
+        <!-- Yeni Sondaj Formu -->
+        <form id="boreholeForm" class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 shadow">
+            <h2 class="font-bold text-amber-400 text-sm uppercase tracking-wider">Yeni Sondaj Noktası Ekle</h2>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Ada / Parsel</label>
+                    <input type="text" id="parcel" required placeholder="Örn: 104 / 12" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Sondaj No</label>
+                    <input type="text" id="skNo" required placeholder="Örn: SK-1" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Derinlik (m)</label>
+                    <input type="number" step="0.5" id="depth" placeholder="Örn: 15" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Yeraltı Suyu (m)</label>
+                    <input type="number" step="0.1" id="waterLevel" placeholder="Yoksa boş bırak" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Saha Notu</label>
+                <input type="text" id="notes" placeholder="Zemin cinsi, karot durumu vb." class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none">
+            </div>
+
+            <!-- Kamera Girişi -->
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Sondaj Fotoğrafı (Otomatik Koordinat Basılır)</label>
+                <input type="file" id="photoInput" accept="image/*" capture="environment" class="block w-full text-xs text-slate-300 file:mr-3 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-700 file:text-amber-400 hover:file:bg-slate-600">
+                <img id="previewImg" class="hidden mt-2 rounded-lg max-h-48 w-full object-cover border border-slate-600" />
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 active:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm shadow-lg mt-2">
+                Sondajı Kaydet
+            </button>
+        </form>
+
+        <!-- Kayıtlı Sondajlar Listesi -->
+        <div class="space-y-2">
+            <h2 class="font-bold text-slate-300 text-sm uppercase tracking-wider px-1">Kayıtlı Sondajlar (<span id="count">0</span>)</h2>
+            <div id="recordsList" class="space-y-3"></div>
+        </div>
+
+    </main>
+
+    <canvas id="watermarkCanvas" class="hidden"></canvas>
+
+    <script>
+        let currentLat = null, currentLon = null, currentAcc = null;
+        let map, marker, db, watchId = null;
+        let processedPhotoDataUrl = null;
+
+        // 1. Harita Başlatma
+        map = L.map('map').setView([38.3687, 34.0370], 6);
+        L.tileLayer('https://arcgisonline.com{z}/{y}/{x}', {
+            attribution: 'Esri Uydu'
+        }).addTo(map);
+
+        // 2. Canlı GPS Takibi (Hem hızlı hem hassas)
+        function startGPS(manual = false) {
+            const statusEl = document.getElementById('gpsStatus');
+            if (!navigator.geolocation) {
+                statusEl.innerText = "Hata: Tarayıcı GPS desteklemiyor.";
+                statusEl.className = "text-[11px] text-rose-400 font-bold";
+                return;
+            }
+
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+
+            statusEl.innerText = "Konum izni kontrol ediliyor / Uydu aranıyor...";
+            statusEl.className = "text-[11px] text-amber-400 font-medium";
+
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    currentLat = pos.coords.latitude.toFixed(6);
+                    currentLon = pos.coords.longitude.toFixed(6);
+                    const accNum = Math.round(pos.coords.accuracy);
+                    currentAcc = accNum + " m";
+
+                    document.getElementById('latVal').innerText = currentLat;
+                    document.getElementById('lonVal').innerText = currentLon;
+                    document.getElementById('accVal').innerText = currentAcc;
+
+                    if (accNum <= 10) {
+                        statusEl.innerText = "● GPS Kilitlendi (Yüksek Hassasiyet)";
+                        statusEl.className = "text-[11px] text-emerald-400 font-bold";
+                    } else {
+                        statusEl.innerText = "● Konum alındı, hassasiyet iyileştiriliyor...";
+                        statusEl.className = "text-[11px] text-sky-400 font-medium";
+                    }
+
+                    const latLng = [parseFloat(currentLat), parseFloat(currentLon)];
+                    if (!marker || manual) {
+                        map.setView(latLng, 18);
+                        manual = false;
+                    }
+                    if (marker) marker.setLatLng(latLng);
+                    else marker = L.marker(latLng).addTo(map);
+                },
+                (err) => {
+                    let msg = "Konum alınamadı.";
+                    if (err.code === 1) msg = "Konum izni reddedildi! Tarayıcı ayarlarından izin verin.";
+                    else if (err.code === 2) msg = "Konum bilgisi ulaşılamıyor (Telefonun GPS/Konum servisini açın).";
+                    else if (err.code === 3) msg = "Zaman aşımı. Açık alana çıkıp 'Konumu Yenile'ye basın.";
+                    
+                    statusEl.innerText = "⚠ " + msg;
+                    statusEl.className = "text-[11px] text-rose-400 font-bold";
+                },
+                { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 }
+            );
+        }
+        startGPS(true);
+
+        // 3. Fotoğraf Çekme ve Filigran Basma
+        document.getElementById('photoInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('watermarkCanvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    const maxDim = 1200;
+                    let w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                        else { w = Math.round(w * maxDim / h); h = maxDim; }
+                    }
+                    canvas.width = w;
+canvas.height = h;
+ctx.drawImage(img, 0, 0, w, h);
+const barHeight = Math.max(60, h * 0.08);
+ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+ctx.fillRect(0, h - barHeight, w, barHeight);
+ctx.fillStyle = "#fbbf24";
+const fontSize = Math.max(16, Math.round(w * 0.025));
+ctx.font = bold ${fontSize}px sans-serif;
+const sk = document.getElementById('skNo').value || "Sondaj";
+const parcel = document.getElementById('parcel').value || "-";
+const dateStr = new Date().toLocaleString('tr-TR');
+const coordStr = currentLat ? ${currentLat}, ${currentLon} : "Konum Yok";
+ctx.fillText(Parsel: ${parcel} | ${sk} | ${dateStr}, 15, h - barHeight + fontSize + 5);
+ctx.fillStyle = "#ffffff";
+ctx.fillText(Koordinat: ${coordStr} (Hassasiyet: ${currentAcc || '-'}), 15, h - 12);
+processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+const preview = document.getElementById('previewImg');
+preview.src = processedPhotoDataUrl;
+preview.classList.remove('hidden');
+};
+img.src = event.target.result;
+};
+reader.readAsDataURL(file);
+});
+// 4. Veritabanı (IndexedDB)
+const request = indexedDB.open("ZeminEtutDB", 1);
+request.onupgradeneeded = (e) => {
+db = e.target.result;
+db.createObjectStore("sondajlar", { keyPath: "id", autoIncrement: true });
+};
+request.onsuccess = (e) => {
+db = e.target.result;
+renderRecords();
+};
+// 5. Kayıt Ekleme
+document.getElementById('boreholeForm').addEventListener('submit', function(e) {
+e.preventDefault();
+if (!currentLat) {
+alert("Henüz GPS konumu alınmadı. Lütfen açık alanda 'Konumu Yenile' butonuna basın.");
+return;
+}
+const record = {
+parcel: document.getElementById('parcel').value,
+skNo: document.getElementById('skNo').value,
+depth: document.getElementById('depth').value,
+waterLevel: document.getElementById('waterLevel').value,
+notes: document.getElementById('notes').value,
+lat: currentLat,
+lon: currentLon,
+acc: currentAcc,
+date: new Date().toLocaleString('tr-TR'),
+photo: processedPhotoDataUrl
+};
+const tx = db.transaction("sondajlar", "readwrite");
+tx.objectStore("sondajlar").add(record);
+tx.oncomplete = () => {
+this.reset();
+document.getElementById('previewImg').classList.add('hidden');
+processedPhotoDataUrl = null;
+renderRecords();
+alert("Sondaj başarıyla telefon hafızasına kaydedildi!");
+};
+});
+// 6. Kayıtları Listeleme
+function renderRecords() {
+const tx = db.transaction("sondajlar", "readonly");
+const store = tx.objectStore("sondajlar");
+const req = store.getAll();
+req.onsuccess = () => {
+const list = document.getElementById('recordsList');
+const records = req.result.reverse();
+document.getElementById('count').innerText = records.length;
+list.innerHTML = "";
+records.forEach(r => {
+const card = document.createElement('div');
+card.className = "bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-3 items-start";
+card.innerHTML = ${r.photo ?:Foto Yok} <div class="flex-1 text-xs space-y-1"> <div class="flex justify-between"> <span class="font-bold text-amber-400 text-sm">${r.skNo} (Parsel: ${r.parcel})</span> <button onclick="deleteRecord(${r.id})" class="text-rose-400 font-bold">Sil</button> </div> <div class="font-mono text-slate-300">${r.lat}, ${r.lon}</div> <div class="text-slate-400">Derinlik: ${r.depth || '-'}m | YAS: ${r.waterLevel || '-'}m</div> ${r.notes ? "${r.notes}": ''} <div class="text-[10px] text-slate-500">${r.date}</div> </div>;
+list.appendChild(card);
+});
+};
+}
+function deleteRecord(id) {
+if (!confirm("Bu sondaj kaydını silmek istediğinize emin misiniz?")) return;
+const tx = db.transaction("sondajlar", "readwrite");
+tx.objectStore("sondajlar").delete(id);
+tx.oncomplete = () => renderRecords();
+}
+function downloadPhoto(dataUrl, filename) {
+const a = document.createElement('a');
+a.href = dataUrl;
+a.download = filename.replace(/\s+/g, '_');
+a.click();
+}
+// 7. Excel (CSV) Çıktısı Alma
+function exportCSV() {
+const tx = db.transaction("sondajlar", "readonly");
+tx.objectStore("sondajlar").getAll().onsuccess = (e) => {
+const records = e.target.result;
+if (!records.length) return alert("Dışa aktarılacak kayıt yok.");
+let csv = "\uFEFFAda/Parsel;Sondaj No;Enlem;Boylam;Hassasiyet;Derinlik (m);YAS (m);Notlar;Tarih\n";
+records.forEach(r => {
+csv += "${r.parcel}";"${r.skNo}";"${r.lat}";"${r.lon}";"${r.acc}";"${r.depth}";"${r.waterLevel}";"${r.notes}";"${r.date}"\n;
+});
+const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = Sondaj_Listesi_${new Date().toISOString().slice(0,10)}.csv;
+a.click();
+};
+}
