@@ -13,7 +13,11 @@
         .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-        #mapFrame { height: 250px; width: 100%; border: none; border-radius: 8px; background: #0f172a; display: block; }
+        .map-wrap { position: relative; height: 250px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; }
+        #satCanvas { width: 100%; height: 100%; display: block; }
+        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .z-btn { width: 34px; height: 34px; background: rgba(15, 23, 42, 0.85); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
+        .maps-link { position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); color: #38bdf8; text-decoration: none; font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 6px; border: 1px solid #334155; }
         .gps-box { margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 12px; line-height: 1.6; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; }
@@ -47,7 +51,14 @@
 
     <main>
         <div class="card">
-            <iframe id="mapFrame" loading="lazy"></iframe>
+            <div class="map-wrap">
+                <canvas id="satCanvas"></canvas>
+                <div class="zoom-btns">
+                    <button type="button" class="z-btn" id="zoomIn">+</button>
+                    <button type="button" class="z-btn" id="zoomOut">−</button>
+                </div>
+                <a id="extMapLink" class="maps-link" target="_blank" rel="noopener">Haritalarda Aç ↗</a>
+            </div>
             <div class="gps-box">
                 <div class="gps-info">
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
@@ -102,99 +113,151 @@
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
     <script>
-        var currentLat = null;
-        var currentLon = null;
+        var currentLat = 38.368700;
+        var currentLon = 34.037000;
+        var hasRealGPS = false;
         var currentAcc = null;
-        var mapBase = "https:" + "//" + "://google.com" + "/maps?q=";
+        var mapZoom = 17;
 
-        document.getElementById('mapFrame').src = mapBase + "38.3687,34.0370&t=k&z=13&output=embed";
+        function drawSatelliteMap(lat, lon, zoom) {
+            var canvas = document.getElementById('satCanvas');
+            var rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width || 400;
+            canvas.height = rect.height || 250;
+            var ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = "#0f172a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            var n = Math.pow(2, zoom);
+            var latRad = lat * Math.PI / 180;
+            var xFloat = (lon + 180) / 360 * n;
+            var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+
+            var tileX = Math.floor(xFloat);
+            var tileY = Math.floor(yFloat);
+            var offsetX = (xFloat - tileX) * 256;
+            var offsetY = (yFloat - tileY) * 256;
+
+            var centerX = canvas.width / 2;
+            var centerY = canvas.height / 2;
+
+            var host = "https:" + "//" + "://google.com" + "/vt/lyrs=y";
+
+            for (var dx = -1; dx <= 1; dx++) {
+                for (var dy = -1; dy <= 1; dy++) {
+                    (function(tx, ty, posX, posY) {
+                        var img = new Image();
+                        img.crossOrigin = "anonymous";
+                        img.onload = function() {
+                            ctx.drawImage(img, posX, posY, 256, 256);
+                            drawPin(ctx, centerX, centerY);
+                        };
+                        img.src = host + "&x=" + tx + "&y=" + ty + "&z=" + zoom;
+                    })(tileX + dx, tileY + dy, centerX - offsetX + dx * 256, centerY - offsetY + dy * 256);
+                }
+            }
+            drawPin(ctx, centerX, centerY);
+        }
+
+        function drawPin(ctx, cx, cy) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "#ef4444";
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#ffffff";
+            ctx.stroke();
+        }
+
+        document.getElementById('zoomIn').addEventListener('click', function() {
+            if (mapZoom < 20) { mapZoom++; drawSatelliteMap(currentLat, currentLon, mapZoom); }
+        });
+        document.getElementById('zoomOut').addEventListener('click', function() {
+            if (mapZoom > 10) { mapZoom--; drawSatelliteMap(currentLat, currentLon, mapZoom); }
+        });
+
+        drawSatelliteMap(currentLat, currentLon, 13);
 
         function ekranaKonumYaz(pos) {
-            currentLat = pos.coords.latitude.toFixed(6);
-            currentLon = pos.coords.longitude.toFixed(6);
-            currentAcc = Math.round(pos.coords.accuracy) + " m";
-
-            document.getElementById('latVal').innerText = currentLat;
-            document.getElementById('lonVal').innerText = currentLon;
-            document.getElementById('accVal').innerText = currentAcc;
-
-            var statusEl = document.getElementById('gpsStatus');
-            statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
-            statusEl.style.color = "#34d399";
-
-            document.getElementById('mapFrame').src = mapBase + currentLat + "," + currentLon + "&t=k&z=18&output=embed";
-        }
-
-        function konumAl() {
-            var statusEl = document.getElementById('gpsStatus');
-            if (!navigator.geolocation) {
-                statusEl.innerText = "Tarayıcı konum desteklemiyor.";
-                statusEl.style.color = "#f87171";
-                return;
-            }
-            statusEl.innerText = "Konum sorgulanıyor...";
-            statusEl.style.color = "#fbbf24";
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function() {},
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-            );
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function(err) {
-                    if (!currentLat) {
-                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-                        statusEl.style.color = "#f87171";
-                    }
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
-        }
-
-        document.getElementById('gpsBtn').addEventListener('click', konumAl);
-        konumAl();
-    </script>
-
-    <script>
-        var db = null;
-        var processedPhotoDataUrl = null;
-        var allRecordsCache = [];
-
-        document.getElementById('photoInput').addEventListener('change', function(e) {
-            var file = e.target.files.item(0);
-            if (!file) return;
-
-            var reader = new FileReader();
-            reader.onload = function(event) {
-                var img = new Image();
-                img.onload = function() {
-                    var canvas = document.getElementById('watermarkCanvas');
-                    var ctx = canvas.getContext('2d');
-                    var maxDim = 1200;
-                    var w = img.width;
-                    var h = img.height;
-                    if (w > maxDim || h > maxDim) {
-                        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-                        else { w = Math.round(w * maxDim / h); h = maxDim; }
-                    }
-                    canvas.width = w;
-                    canvas.height = h;
-                    ctx.drawImage(img, 0, 0, w, h);
-
-                    var barH = Math.max(60, h * 0.08);
-                    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                    ctx.fillRect(0, h - barH, w, barH);
-
-                    ctx.fillStyle = "#fbbf24";
-                    var fSize = Math.max(16, Math.round(w * 0.025));
-                    ctx.font = "bold " + fSize + "px sans-serif";
-                    
-                    var sk = document.getElementById('skNo').value || "Sondaj";
-                    var parcel = document.getElementById('parcel').value || "-";
-                    var dateStr = new Date().toLocaleString('tr-TR');
-var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
+            currentLat = parseFloat(pos.coords.latitude.toFixed(6));
+currentLon = parseFloat(pos.coords.longitude.toFixed(6));
+hasRealGPS = true;
+currentAcc = Math.round(pos.coords.accuracy) + " m";
+document.getElementById('latVal').innerText = currentLat.toFixed(6);
+document.getElementById('lonVal').innerText = currentLon.toFixed(6);
+document.getElementById('accVal').innerText = currentAcc;
+var statusEl = document.getElementById('gpsStatus');
+statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
+statusEl.style.color = "#34d399";
+var gUrl = "https:" + "//" + "google.com" + "/maps/search/?api=1&query=" + currentLat + "," + currentLon;
+document.getElementById('extMapLink').href = gUrl;
+drawSatelliteMap(currentLat, currentLon, mapZoom);
+}
+function konumAl() {
+var statusEl = document.getElementById('gpsStatus');
+if (!navigator.geolocation) {
+statusEl.innerText = "Tarayıcı konum desteklemiyor.";
+statusEl.style.color = "#f87171";
+return;
+}
+statusEl.innerText = "Konum sorgulanıyor...";
+statusEl.style.color = "#fbbf24";
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function() {},
+{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+);
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function(err) {
+if (!hasRealGPS) {
+statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+statusEl.style.color = "#f87171";
+}
+},
+{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+);
+}
+document.getElementById('gpsBtn').addEventListener('click', konumAl);
+konumAl();
+var db = null;
+var processedPhotoDataUrl = null;
+var allRecordsCache = [];
+document.getElementById('photoInput').addEventListener('change', function(e) {
+var file = e.target.files.item(0);
+if (!file) return;
+var reader = new FileReader();
+reader.onload = function(event) {
+var img = new Image();
+img.onload = function() {
+var canvas = document.getElementById('watermarkCanvas');
+var ctx = canvas.getContext('2d');
+var maxDim = 1200;
+var w = img.width;
+var h = img.height;
+if (w > maxDim || h > maxDim) {
+if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+else { w = Math.round(w * maxDim / h); h = maxDim; }
+}
+canvas.width = w;
+canvas.height = h;
+ctx.drawImage(img, 0, 0, w, h);
+var barH = Math.max(60, h * 0.08);
+ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+ctx.fillRect(0, h - barH, w, barH);
+ctx.fillStyle = "#fbbf24";
+var fSize = Math.max(16, Math.round(w * 0.025));
+ctx.font = "bold " + fSize + "px sans-serif";
+var sk = document.getElementById('skNo').value || "Sondaj";
+var parcel = document.getElementById('parcel').value || "-";
+var dateStr = new Date().toLocaleString('tr-TR');
+var coordStr = hasRealGPS ? (currentLat.toFixed(6) + ", " + currentLon.toFixed(6)) : "Konum Yok";
 ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
 ctx.fillStyle = "#ffffff";
 ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
@@ -218,7 +281,7 @@ renderRecords();
 };
 document.getElementById('boreholeForm').addEventListener('submit', function(e) {
 e.preventDefault();
-if (!currentLat) {
+if (!hasRealGPS) {
 alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
 return;
 }
@@ -228,8 +291,8 @@ skNo: document.getElementById('skNo').value,
 depth: document.getElementById('depth').value,
 waterLevel: document.getElementById('waterLevel').value,
 notes: document.getElementById('notes').value,
-lat: currentLat,
-lon: currentLon,
+lat: currentLat.toFixed(6),
+lon: currentLon.toFixed(6),
 acc: currentAcc,
 date: new Date().toLocaleString('tr-TR'),
 photo: processedPhotoDataUrl
