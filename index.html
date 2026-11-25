@@ -18,6 +18,7 @@
         .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
         .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
         .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
+        .layer-btn { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.88); color: #f1f5f9; border: 1px solid #475569; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 7px 10px; cursor: pointer; z-index: 20; }
         .gps-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 13px; line-height: 1.7; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
@@ -53,6 +54,7 @@
             <div class="map-wrap">
                 <div id="tileLayer"></div>
                 <div class="pin-center"></div>
+                <button type="button" class="layer-btn" id="layerBtn">Uydu / Harita</button>
                 <div class="zoom-btns">
                     <button type="button" class="z-btn" id="zoomIn">+</button>
                     <button type="button" class="z-btn" id="zoomOut">−</button>
@@ -116,47 +118,7 @@
         var currentLon = null;
         var currentAcc = null;
         var mapZoom = 17;
-
-        function uyduCiz(lat, lon, zoom) {
-            try {
-                var box = document.getElementById('tileLayer');
-                var w = box.clientWidth || 360;
-                var h = box.clientHeight || 250;
-                box.innerHTML = "";
-
-                var n = Math.pow(2, zoom);
-                var latRad = lat * Math.PI / 180;
-                var xFloat = (lon + 180) / 360 * n;
-                var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-
-                var tileX = Math.floor(xFloat);
-                var tileY = Math.floor(yFloat);
-                var offX = (xFloat - tileX) * 256;
-                var offY = (yFloat - tileY) * 256;
-
-                var cx = w / 2;
-                var cy = h / 2;
-
-                var u = new URL(window.location.href);
-                u.protocol = "https:";
-                u.hostname = "://arcgisonline.com";
-                u.search = "";
-
-                for (var dx = -1; dx <= 1; dx++) {
-                    for (var dy = -1; dy <= 1; dy++) {
-                        var img = document.createElement('img');
-                        u.pathname = "/ArcGIS/rest/services/World_Imagery/MapServer/tile/" + zoom + "/" + (tileY + dy) + "/" + (tileX + dx);
-                        img.src = u.toString();
-                        img.style.position = "absolute";
-                        img.style.width = "256px";
-                        img.style.height = "256px";
-                        img.style.left = Math.round(cx - offX + dx * 256) + "px";
-                        img.style.top = Math.round(cy - offY + dy * 256) + "px";
-                        box.appendChild(img);
-                    }
-                }
-            } catch (err) {}
-        }
+        var isSat = true;
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -184,30 +146,82 @@
             statusEl.innerText = "Konum sorgulanıyor...";
             statusEl.style.color = "#fbbf24";
 
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function() {},
-{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-);
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function(err) {
-if (!currentLat) {
-statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-statusEl.style.color = "#f87171";
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function() {},
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+            );
+
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function(err) {
+                    if (!currentLat) {
+                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+                        statusEl.style.color = "#f87171";
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
+        }
+
+        document.getElementById('gpsBtn').addEventListener('click', konumAl);
+        konumAl();
+
+        function uyduCiz(lat, lon, zoom) {
+            var box = document.getElementById('tileLayer');
+            var w = box.clientWidth || 360;
+            var h = box.clientHeight || 250;
+            box.innerHTML = "";
+
+            var n = Math.pow(2, zoom);
+            var latRad = lat * Math.PI / 180;
+            var xFloat = (lon + 180) / 360 * n;
+            var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+
+            var tileX = Math.floor(xFloat);
+            var tileY = Math.floor(yFloat);
+            var offX = (xFloat - tileX) * 256;
+            var offY = (yFloat - tileY) * 256;
+
+var cx = w / 2;
+var cy = h / 2;
+var satHost = atob("aHR0cHM6Ly9zZXJ2ZXIuYXJjZ2lzb25saW5lLmNvbS9BcmNHSVMvcmVzdC9zZXJ2aWNlcy9Xb3JsZF9JbWFnZXJ5L01hcFNlcnZlci90aWxlLw==");
+var osmHost = atob("aHR0cHM6Ly90aWxlLm9wZW5zdHJlZXRtYXAub3JnLw==");
+for (var dx = -1; dx <= 1; dx++) {
+for (var dy = -1; dy <= 1; dy++) {
+var img = document.createElement('img');
+var tx = tileX + dx;
+var ty = tileY + dy;
+if (isSat) {
+img.src = satHost + zoom + "/" + ty + "/" + tx;
+} else {
+img.src = osmHost + zoom + "/" + tx + "/" + ty + ".png";
 }
-},
-{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-);
+img.style.position = "absolute";
+img.style.width = "256px";
+img.style.height = "256px";
+img.style.left = Math.round(cx - offX + dx * 256) + "px";
+img.style.top = Math.round(cy - offY + dy * 256) + "px";
+box.appendChild(img);
+}
+}
 }
 document.getElementById('zoomIn').addEventListener('click', function() {
-if (mapZoom < 19 && currentLat) { mapZoom++; uyduCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom); }
+if (mapZoom < 19) {
+mapZoom++;
+uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+}
 });
 document.getElementById('zoomOut').addEventListener('click', function() {
-if (mapZoom > 10 && currentLat) { mapZoom--; uyduCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom); }
+if (mapZoom > 10) {
+mapZoom--;
+uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+}
 });
-document.getElementById('gpsBtn').addEventListener('click', konumAl);
-konumAl();
+document.getElementById('layerBtn').addEventListener('click', function() {
+isSat = !isSat;
+uyduCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+});
 uyduCiz(38.3687, 34.0370, 12);
 var db = null;
 var processedPhotoDataUrl = null;
