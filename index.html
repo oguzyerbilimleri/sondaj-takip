@@ -45,7 +45,7 @@
 
     <header>
         <div>
-            <h1>Saha Sondaj Takip</h1>
+            <h1>Saha Sondaj Takip v5</h1>
             <p>Zemin Etüt Veri Toplama</p>
         </div>
         <button type="button" class="btn-csv" id="csvBtn">Excel (CSV) İndir</button>
@@ -68,7 +68,7 @@
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
                     <div>Boylam (Lon): <span id="lonVal" class="gps-val">-</span></div>
                     <div>Hassasiyet: <span id="accVal" class="gps-acc">-</span></div>
-                    <div id="gpsStatus">Sistem başlatılıyor...</div>
+                    <div id="gpsStatus">Konum bekleniyor...</div>
                 </div>
                 <button type="button" class="btn-gps" id="gpsBtn">Konum Al</button>
             </div>
@@ -123,100 +123,100 @@
         var currentAcc = null;
         var mapZoom = 17;
         var isSat = true;
-        var proto = window.location.protocol + "//";
 
-        function getTileUrl(x, y, z) {
-            if (isSat) {
-                return proto + "://google.com" + x + "&y=" + y + "&z=" + z;
-            }
-            return proto + "tile.openstreetmap.org/" + z + "/" + x + "/" + y + ".png";
+        function ekranaKonumYaz(pos) {
+            currentLat = parseFloat(pos.coords.latitude.toFixed(6));
+            currentLon = parseFloat(pos.coords.longitude.toFixed(6));
+            hasRealGPS = true;
+            currentAcc = Math.round(pos.coords.accuracy) + " m";
+
+            document.getElementById('latVal').innerText = currentLat.toFixed(6);
+            document.getElementById('lonVal').innerText = currentLon.toFixed(6);
+            document.getElementById('accVal').innerText = currentAcc;
+
+            var statusEl = document.getElementById('gpsStatus');
+            statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
+            statusEl.style.color = "#34d399";
+
+            document.getElementById('extMapLink').href = "//://google.com" + currentLat + "," + currentLon;
+            renderTiles(currentLat, currentLon, mapZoom);
         }
 
-        function renderTiles(lat, lon, zoom) {
-            var box = document.getElementById('tileLayer');
-            var w = box.clientWidth || 360;
-            var h = box.clientHeight || 250;
-            box.innerHTML = "";
-
-            var n = Math.pow(2, zoom);
-            var latRad = lat * Math.PI / 180;
-            var xFloat = (lon + 180) / 360 * n;
-            var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-
-            var tileX = Math.floor(xFloat);
-            var tileY = Math.floor(yFloat);
-            var offX = (xFloat - tileX) * 256;
-            var offY = (yFloat - tileY) * 256;
-
-            var cx = w / 2;
-            var cy = h / 2;
-
-            for (var dx = -1; dx <= 1; dx++) {
-                for (var dy = -1; dy <= 1; dy++) {
-                    var img = document.createElement('img');
-                    img.src = getTileUrl(tileX + dx, tileY + dy, zoom);
-                    img.style.position = "absolute";
-                    img.style.width = "256px";
-                    img.style.height = "256px";
-                    img.style.left = Math.round(cx - offX + dx * 256) + "px";
-                    img.style.top = Math.round(cy - offY + dy * 256) + "px";
-                    box.appendChild(img);
-                }
+        function konumAl() {
+            var statusEl = document.getElementById('gpsStatus');
+            if (!navigator.geolocation) {
+                statusEl.innerText = "Tarayıcı konum desteklemiyor.";
+                statusEl.style.color = "#f87171";
+                return;
             }
+            statusEl.innerText = "Konum sorgulanıyor...";
+            statusEl.style.color = "#fbbf24";
+
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function() {},
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+            );
+
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function(err) {
+                    if (!hasRealGPS) {
+                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+                        statusEl.style.color = "#f87171";
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
         }
 
-        document.getElementById('zoomIn').addEventListener('click', function() {
-            if (mapZoom < 20) { mapZoom++; renderTiles(currentLat, currentLon, mapZoom); }
-        });
-        document.getElementById('zoomOut').addEventListener('click', function() {
-            if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
-        });
+document.getElementById('gpsBtn').addEventListener('click', konumAl);
+konumAl();
+function getTileUrl(x, y, z) {
+if (isSat) {
+return "//google.com" + x + "&y=" + y + "&z=" + z;
+}
+return "//tile.openstreetmap.org/" + z + "/" + x + "/" + y + ".png";
+}
+function renderTiles(lat, lon, zoom) {
+var box = document.getElementById('tileLayer');
+var w = box.clientWidth || 360;
+var h = box.clientHeight || 250;
+box.innerHTML = "";
+var n = Math.pow(2, zoom);
+var latRad = lat * Math.PI / 180;
+var xFloat = (lon + 180) / 360 * n;
+var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+var tileX = Math.floor(xFloat);
+var tileY = Math.floor(yFloat);
+var offX = (xFloat - tileX) * 256;
+var offY = (yFloat - tileY) * 256;
+var cx = w / 2;
+var cy = h / 2;
+for (var dx = -1; dx <= 1; dx++) {
+for (var dy = -1; dy <= 1; dy++) {
+var img = document.createElement('img');
+img.src = getTileUrl(tileX + dx, tileY + dy, zoom);
+img.style.position = "absolute";
+img.style.width = "256px";
+img.style.height = "256px";
+img.style.left = Math.round(cx - offX + dx * 256) + "px";
+img.style.top = Math.round(cy - offY + dy * 256) + "px";
+box.appendChild(img);
+}
+}
+}
+document.getElementById('zoomIn').addEventListener('click', function() {
+if (mapZoom < 20) { mapZoom++; renderTiles(currentLat, currentLon, mapZoom); }
+});
+document.getElementById('zoomOut').addEventListener('click', function() {
+if (mapZoom > 10) { mapZoom--; renderTiles(currentLat, currentLon, mapZoom); }
+});
 document.getElementById('layerBtn').addEventListener('click', function() {
 isSat = !isSat;
 renderTiles(currentLat, currentLon, mapZoom);
 });
 renderTiles(currentLat, currentLon, 13);
-function ekranaKonumYaz(pos) {
-currentLat = parseFloat(pos.coords.latitude.toFixed(6));
-currentLon = parseFloat(pos.coords.longitude.toFixed(6));
-hasRealGPS = true;
-currentAcc = Math.round(pos.coords.accuracy) + " m";
-document.getElementById('latVal').innerText = currentLat.toFixed(6);
-document.getElementById('lonVal').innerText = currentLon.toFixed(6);
-document.getElementById('accVal').innerText = currentAcc;
-var statusEl = document.getElementById('gpsStatus');
-statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
-statusEl.style.color = "#34d399";
-document.getElementById('extMapLink').href = proto + "google.com" + currentLat + "," + currentLon;
-renderTiles(currentLat, currentLon, mapZoom);
-}
-function konumAl() {
-var statusEl = document.getElementById('gpsStatus');
-if (!navigator.geolocation) {
-statusEl.innerText = "Tarayıcı konum desteklemiyor.";
-statusEl.style.color = "#f87171";
-return;
-}
-statusEl.innerText = "Konum sorgulanıyor...";
-statusEl.style.color = "#fbbf24";
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function() {},
-{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-);
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function(err) {
-if (!hasRealGPS) {
-statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-statusEl.style.color = "#f87171";
-}
-},
-{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-);
-}
-document.getElementById('gpsBtn').addEventListener('click', konumAl);
-konumAl();
 var db = null;
 var processedPhotoDataUrl = null;
 var allRecordsCache = [];
