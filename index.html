@@ -174,14 +174,15 @@
         konumAl();
     </script>
 
-    <!-- 2. BLOK: MAPTILER SATELLITE VE YEREL ALTLIK -->
+    <!-- 2. BLOK: MAPTILER UYDU VE YEREL ALTLIK -->
     <script>
         var mapZoom = 17;
         var mtKey = "LLZMhjAwzMdIqcazuDtw";
 
         function mapTilerCiz(lat, lon, zoom) {
-            var box = document.getElementById('tileLayer');
-            var w = box.clientWidth || 360;
+            try {
+                var box = document.getElementById('tileLayer');
+var w = box.clientWidth || 360;
 var h = box.clientHeight || 260;
 box.innerHTML = "";
 var n = Math.pow(2, zoom);
@@ -194,17 +195,13 @@ var offX = (xFloat - tileX) * 256;
 var offY = (yFloat - tileY) * 256;
 var cx = w / 2;
 var cy = h / 2;
+var host = "https:" + "//" + "api.maptiler." + "com/tiles/satellite-v2/";
 for (var dx = -1; dx <= 1; dx++) {
 for (var dy = -1; dy <= 1; dy++) {
 var img = document.createElement('img');
 var tx = tileX + dx;
 var ty = tileY + dy;
-var u = new URL(window.location.href);
-u.protocol = "https:";
-u.hostname = "maptiler.com";
-u.pathname = "/maps/satellite/" + zoom + "/" + tx + "/" + ty + ".jpg";
-u.search = "?key=" + mtKey;
-img.src = u.toString();
+img.src = host + zoom + "/" + tx + "/" + ty + ".jpg?key=" + mtKey;
 img.style.position = "absolute";
 img.style.width = "256px";
 img.style.height = "256px";
@@ -213,6 +210,7 @@ img.style.top = Math.round(cy - offY + dy * 256) + "px";
 box.appendChild(img);
 }
 }
+} catch (e) {}
 }
 document.getElementById('bgFileInput').addEventListener('change', function(e) {
 var f = e.target.files.item(0);
