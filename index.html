@@ -15,9 +15,11 @@
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
         .map-wrap { position: relative; height: 260px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
         #tileLayer { position: absolute; inset: 0; overflow: hidden; }
+        #localBg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; z-index: 2; }
         .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
         .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
         .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
+        .bg-upload-btn { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.88); color: #38bdf8; border: 1px solid #475569; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 7px 9px; cursor: pointer; z-index: 20; }
         .gps-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 13px; line-height: 1.7; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
@@ -52,7 +54,12 @@
         <div class="card">
             <div class="map-wrap">
                 <div id="tileLayer"></div>
+                <img id="localBg" />
                 <div class="pin-center"></div>
+                <label class="bg-upload-btn">
+                    Altlık Görüntü Yükle
+                    <input type="file" id="bgFileInput" accept="image/*" style="display:none;">
+                </label>
                 <div class="zoom-btns">
                     <button type="button" class="z-btn" id="zoomIn">+</button>
                     <button type="button" class="z-btn" id="zoomOut">−</button>
@@ -111,7 +118,7 @@
 
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
-    <!-- 1. BLOK: SADECE GPS -->
+    <!-- 1. BLOK: GPS -->
     <script>
         var currentLat = null;
         var currentLon = null;
@@ -167,7 +174,7 @@
         konumAl();
     </script>
 
-    <!-- 2. BLOK: MAPTILER UYDU -->
+    <!-- 2. BLOK: MAPTILER SATELLITE VE YEREL ALTLIK -->
     <script>
         var mapZoom = 17;
         var mtKey = "LLZMhjAwzMdIqcazuDtw";
@@ -175,23 +182,19 @@
         function mapTilerCiz(lat, lon, zoom) {
             var box = document.getElementById('tileLayer');
             var w = box.clientWidth || 360;
-            var h = box.clientHeight || 260;
-            box.innerHTML = "";
-
-            var n = Math.pow(2, zoom);
-            var latRad = lat * Math.PI / 180;
-            var xFloat = (lon + 180) / 360 * n;
-            var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-
-            var tileX = Math.floor(xFloat);
-            var tileY = Math.floor(yFloat);
-            var offX = (xFloat - tileX) * 256;
-            var offY = (yFloat - tileY) * 256;
-
-            var cx = w / 2;
-            var cy = h / 2;
-
-            for (var dx = -1; dx <= 1; dx++) {
+var h = box.clientHeight || 260;
+box.innerHTML = "";
+var n = Math.pow(2, zoom);
+var latRad = lat * Math.PI / 180;
+var xFloat = (lon + 180) / 360 * n;
+var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+var tileX = Math.floor(xFloat);
+var tileY = Math.floor(yFloat);
+var offX = (xFloat - tileX) * 256;
+var offY = (yFloat - tileY) * 256;
+var cx = w / 2;
+var cy = h / 2;
+for (var dx = -1; dx <= 1; dx++) {
 for (var dy = -1; dy <= 1; dy++) {
 var img = document.createElement('img');
 var tx = tileX + dx;
@@ -199,7 +202,7 @@ var ty = tileY + dy;
 var u = new URL(window.location.href);
 u.protocol = "https:";
 u.hostname = "maptiler.com";
-u.pathname = "/maps/hybrid/256/" + zoom + "/" + tx + "/" + ty + ".jpg";
+u.pathname = "/maps/satellite/" + zoom + "/" + tx + "/" + ty + ".jpg";
 u.search = "?key=" + mtKey;
 img.src = u.toString();
 img.style.position = "absolute";
@@ -211,6 +214,17 @@ box.appendChild(img);
 }
 }
 }
+document.getElementById('bgFileInput').addEventListener('change', function(e) {
+var f = e.target.files.item(0);
+if (!f) return;
+var r = new FileReader();
+r.onload = function(ev) {
+var bg = document.getElementById('localBg');
+bg.src = ev.target.result;
+bg.style.display = "block";
+};
+r.readAsDataURL(f);
+});
 document.getElementById('zoomIn').addEventListener('click', function() {
 if (mapZoom < 20) {
 mapZoom++;
@@ -224,9 +238,25 @@ mapTilerCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFlo
 }
 });
 mapTilerCiz(38.3687, 34.0370, 13);
-var db = null;
 var processedPhotoDataUrl = null;
-var allRecordsCache = new Array();
+var STORAGE_KEY = "zemin_etut_sondajlar_v1";
+function getRecords() {
+try {
+var raw = localStorage.getItem(STORAGE_KEY);
+return raw ? JSON.parse(raw) : new Array();
+} catch (e) {
+return new Array();
+}
+}
+function saveRecords(arr) {
+try {
+localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+return true;
+} catch (e) {
+alert("Hafıza dolu! Lütfen eski kayıtları Excel olarak indirip silin.");
+return false;
+}
+}
 document.getElementById('photoInput').addEventListener('change', function(e) {
 var file = e.target.files.item(0);
 if (!file) return;
@@ -236,7 +266,7 @@ var img = new Image();
 img.onload = function() {
 var canvas = document.getElementById('watermarkCanvas');
 var ctx = canvas.getContext('2d');
-var maxDim = 1200;
+var maxDim = 900;
 var w = img.width;
 var h = img.height;
 if (w > maxDim || h > maxDim) {
@@ -246,20 +276,20 @@ else { w = Math.round(w * maxDim / h); h = maxDim; }
 canvas.width = w;
 canvas.height = h;
 ctx.drawImage(img, 0, 0, w, h);
-var barH = Math.max(64, Math.round(h * 0.09));
-ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+var barH = Math.max(60, Math.round(h * 0.10));
+ctx.fillStyle = "rgba(0, 0, 0, 0.80)";
 ctx.fillRect(0, h - barH, w, barH);
 ctx.fillStyle = "#fbbf24";
-var fSize = Math.max(16, Math.round(w * 0.026));
+var fSize = Math.max(15, Math.round(w * 0.026));
 ctx.font = "bold " + fSize + "px sans-serif";
 var sk = document.getElementById('skNo').value || "Sondaj";
 var parcel = document.getElementById('parcel').value || "-";
 var dateStr = new Date().toLocaleString('tr-TR');
 var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
-ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 6);
+ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 12, h - barH + fSize + 5);
 ctx.fillStyle = "#ffffff";
-ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 14);
-processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 12, h - 12);
+processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.72);
 var preview = document.getElementById('previewImg');
 preview.src = processedPhotoDataUrl;
 preview.style.display = "block";
@@ -268,22 +298,15 @@ img.src = event.target.result;
 };
 reader.readAsDataURL(file);
 });
-var reqDB = indexedDB.open("ZeminEtutDB", 1);
-reqDB.onupgradeneeded = function(e) {
-db = e.target.result;
-db.createObjectStore("sondajlar", { keyPath: "id", autoIncrement: true });
-};
-reqDB.onsuccess = function(e) {
-db = e.target.result;
-renderRecords();
-};
 document.getElementById('boreholeForm').addEventListener('submit', function(e) {
 e.preventDefault();
 if (!currentLat) {
 alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
 return;
 }
+var records = getRecords();
 var record = {
+id: Date.now(),
 parcel: document.getElementById('parcel').value,
 skNo: document.getElementById('skNo').value,
 depth: document.getElementById('depth').value,
@@ -295,25 +318,21 @@ acc: currentAcc,
 date: new Date().toLocaleString('tr-TR'),
 photo: processedPhotoDataUrl
 };
-var tx = db.transaction("sondajlar", "readwrite");
-tx.objectStore("sondajlar").add(record);
-tx.oncomplete = function() {
+records.unshift(record);
+if (saveRecords(records)) {
 document.getElementById('boreholeForm').reset();
 document.getElementById('previewImg').style.display = "none";
 processedPhotoDataUrl = null;
 renderRecords();
-alert("Sondaj kaydedildi!");
-};
+alert("Sondaj başarıyla kaydedildi!");
+}
 });
 function renderRecords() {
-if (!db) return;
-var tx = db.transaction("sondajlar", "readonly");
-tx.objectStore("sondajlar").getAll().onsuccess = function(e) {
 var list = document.getElementById('recordsList');
-allRecordsCache = e.target.result.reverse();
-document.getElementById('count').innerText = allRecordsCache.length;
+var records = getRecords();
+document.getElementById('count').innerText = records.length;
 list.innerHTML = "";
-allRecordsCache.forEach(function(r, idx) {
+records.forEach(function(r, idx) {
 var card = document.createElement('div');
 card.className = "rec-item";
 var imgHtml = r.photo
@@ -329,16 +348,16 @@ card.innerHTML = imgHtml +
 '' + r.date + '';
 list.appendChild(card);
 });
-};
 }
 function deleteRecord(id) {
 if (!confirm("Silmek istediğinize emin misiniz?")) return;
-var tx = db.transaction("sondajlar", "readwrite");
-tx.objectStore("sondajlar").delete(id);
-tx.oncomplete = renderRecords;
+var records = getRecords().filter(function(r) { return r.id !== id; });
+saveRecords(records);
+renderRecords();
 }
 function downloadByIdx(idx) {
-var r = allRecordsCache.at(idx);
+var records = getRecords();
+var r = records.at(idx);
 if (!r || !r.photo) return;
 var a = document.createElement('a');
 a.href = r.photo;
@@ -346,10 +365,7 @@ a.download = (r.parcel + "" + r.skNo + ".jpg").replace(/\s+/g, '');
 a.click();
 }
 document.getElementById('csvBtn').addEventListener('click', function() {
-if (!db) return;
-var tx = db.transaction("sondajlar", "readonly");
-tx.objectStore("sondajlar").getAll().onsuccess = function(e) {
-var records = e.target.result;
+var records = getRecords();
 if (!records.length) return alert("Kayıt yok.");
 var bom = String.fromCharCode(65279);
 var csv = bom + "Ada/Parsel;Sondaj No;Enlem;Boylam;Hassasiyet;Derinlik (m);YAS (m);Notlar;Tarih\n";
@@ -361,5 +377,5 @@ var a = document.createElement('a');
 a.href = URL.createObjectURL(blob);
 a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0,10) + ".csv";
 a.click();
-};
 });
+renderRecords();
