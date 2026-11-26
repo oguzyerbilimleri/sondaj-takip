@@ -235,7 +235,7 @@ function csvIndir() {
     "Sondaj No",
     "Enlem (Lat)",
     "Boylam (Lon)",
-    "Kot (Rakım)",
+    "Kot (Rakim)",
     "Hassasiyet",
     "Derinlik (m)",
     "YAS (m)",
@@ -243,185 +243,64 @@ function csvIndir() {
     "Tarih / Saat"
   );
 
-  var satirlar = new Array();
-  satirlar.push(basliklar);
+  // Sütun genişlikleri (karakter sayısı olarak - uzun veriler kesinlikle kesilmez)
+  var genislikler = new Array(16, 13, 16, 16, 14, 13, 15, 13, 36, 24);
 
-  arr.forEach(function(x) {
+  var slk = "ID;PSOND_TAKIP;N;E\r\n";
+  slk += "P;PGeneral\r\n";
+  slk += "P;P@\r\n";
+  slk += "F;P0;DG0G8;M255\r\n";
+
+  // Sütun genişliklerini tanımla
+  for (var c = 0; c < genislikler.length; c++) {
+    slk += "F;W" + (c + 1) + " " + (c + 1) + " " + genislikler[c] + "\r\n";
+  }
+
+  function temizle(val) {
+    var s = String(val || "-");
+    return s.replace(/;/g, ",").replace(/\r/g, " ").replace(/\n/g, " ");
+  }
+
+  // Başlık satırı (Kalın ve Metin formatında)
+  for (var h = 0; h < basliklar.length; h++) {
+    slk += "F;SDM1;Y1;X" + (h + 1) + "\r\n";
+    slk += 'C;Y1;X' + (h + 1) + ';K"' + temizle(basliklar[h]) + '"\r\n';
+  }
+
+  // Veri satırları
+  for (var r = 0; r < arr.length; r++) {
+    var x = arr[r];
+    var rowNum = r + 2;
     var derStr = x.d ? (x.d + " m") : "-";
     var yasStr = x.w ? (x.w + " m") : "-";
-    satirlar.push(new Array(
-      String(x.p || "-"),
-      String(x.s || "-"),
-      String(x.lat || "-"),
-      String(x.lon || "-"),
-      String(x.kot || "-"),
-      String(x.acc || "-"),
+
+    var hucreler = new Array(
+      x.p || "-",
+      x.s || "-",
+      x.lat || "-",
+      x.lon || "-",
+      x.kot || "-",
+      x.acc || "-",
       derStr,
       yasStr,
-      String(x.n || "-"),
-      String(x.t || "-")
-    ));
-  });
+      x.n || "-",
+      x.t || "-"
+    );
 
-  // Her sütun için maksimum karakter genişliğini hesapla
-  var colWidths = new Array();
-  for (var c = 0; c < basliklar.length; c++) {
-    var maxLen = basliklar.at(c).length;
-    satirlar.forEach(function(row) {
-      var val = String(row.at(c) || "");
-      if (val.length > maxLen) maxLen = val.length;
-    });
-    colWidths.push(maxLen + 6);
-  }
-
-  function xmlEsc(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
-  function colName(n) {
-    var s = "";
-    while (n >= 0) {
-      s = String.fromCharCode((n % 26) + 65) + s;
-      n = Math.floor(n / 26) - 1;
+    for (var col = 0; col < hucreler.length; col++) {
+      slk += "F;P1;Y" + rowNum + ";X" + (col + 1) + "\r\n";
+      slk += 'C;Y' + rowNum + ';X' + (col + 1) + ';K"' + temizle(hucreler[col]) + '"\r\n';
     }
-    return s;
   }
 
-  var colsXml = "<cols>";
-  colWidths.forEach(function(w, idx) {
-    colsXml += '<col min="' + (idx + 1) + '" max="' + (idx + 1) + '" width="' + w + '" customWidth="1"/>';
-  });
-  colsXml += "</cols>";
+  slk += "E\r\n";
 
-  var sheetDataXml = "<sheetData>";
-  satirlar.forEach(function(row, rIdx) {
-    sheetDataXml += '<row r="' + (rIdx + 1) + '">';
-    row.forEach(function(val, cIdx) {
-      var ref = colName(cIdx) + (rIdx + 1);
-      var style = rIdx === 0 ? ' s="1"' : '';
-      sheetDataXml += '<c r="' + ref + '" t="inlineStr"' + style + '><is><t>' + xmlEsc(val) + '</t></is></c>';
-    });
-    sheetDataXml += "</row>";
-  });
-  sheetDataXml += "</sheetData>";
-
-  var sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<worksheet xmlns="http://openxmlformats.org">' +
-    colsXml + sheetDataXml + '</worksheet>';
-
-  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<styleSheet xmlns="http://openxmlformats.org">' +
-    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font></fonts>' +
-    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF59E0B"/></patternFill></fill></fills>' +
-    '<borders count="2"><border/><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/></border></borders>' +
-    '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs>' +
-    '</styleSheet>';
-
-  var workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<workbook xmlns="http://openxmlformats.org" xmlns:r="http://openxmlformats.org">' +
-    '<sheets><sheet name="Sondaj Listesi" sheetId="1" r:id="rId1"/></sheets></workbook>';
-
-  var wbRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://openxmlformats.org">' +
-    '<Relationship Id="rId1" Type="http://openxmlformats.org/worksheet" Target="worksheets/sheet1.xml"/>' +
-    '<Relationship Id="rId2" Type="http://openxmlformats.org/styles" Target="styles.xml"/>' +
-    '</Relationships>';
-
-  var rootRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://openxmlformats.org">' +
-    '<Relationship Id="rId1" Type="http://openxmlformats.org/officeDocument" Target="xl/workbook.xml"/>' +
-    '</Relationships>';
-
-  var contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Types xmlns="http://openxmlformats.org">' +
-    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-    '<Default Extension="xml" ContentType="application/xml"/>' +
-    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
-    '</Types>';
-
-  var files = new Array(
-    { name: "[Content_Types].xml", data: contentTypesXml },
-    { name: "_rels/.rels", data: rootRelsXml },
-    { name: "xl/workbook.xml", data: workbookXml },
-    { name: "xl/_rels/workbook.xml.rels", data: wbRelsXml },
-    { name: "xl/styles.xml", data: stylesXml },
-    { name: "xl/worksheets/sheet1.xml", data: sheetXml }
-  );
-
-  var enc = new TextEncoder();
-  var crcTable = new Uint32Array(256);
-  for (var i = 0; i < 256; i++) {
-    var c = i;
-    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    crcTable[i] = c;
-  }
-  function crc32(bytes) {
-    var crc = -1;
-    for (var i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xFF];
-    return (crc ^ -1) >>> 0;
-  }
-
-  var chunks = new Array();
-  var centralDir = new Array();
-  var offset = 0;
-
-  files.forEach(function(f) {
-    var nameBytes = enc.encode(f.name);
-    var dataBytes = enc.encode(f.data);
-    var crc = crc32(dataBytes);
-
-    var lfh = new Uint8Array(30 + nameBytes.length);
-    var dv = new DataView(lfh.buffer);
-    dv.setUint32(0, 0x04034b50, true);
-    dv.setUint16(4, 20, true);
-    dv.setUint16(8, 0, true);
-    dv.setUint32(14, crc, true);
-    dv.setUint32(18, dataBytes.length, true);
-    dv.setUint32(22, dataBytes.length, true);
-    dv.setUint16(26, nameBytes.length, true);
-    lfh.set(nameBytes, 30);
-
-    chunks.push(lfh);
-    chunks.push(dataBytes);
-
-    var cdh = new Uint8Array(46 + nameBytes.length);
-    var cdv = new DataView(cdh.buffer);
-    cdv.setUint32(0, 0x02014b50, true);
-    cdv.setUint16(4, 20, true);
-    cdv.setUint16(6, 20, true);
-    cdv.setUint32(16, crc, true);
-    cdv.setUint32(20, dataBytes.length, true);
-    cdv.setUint32(24, dataBytes.length, true);
-    cdv.setUint16(28, nameBytes.length, true);
-    cdv.setUint32(42, offset, true);
-    cdh.set(nameBytes, 46);
-
-    centralDir.push(cdh);
-    offset += lfh.length + dataBytes.length;
-  });
-
-  var cdOffset = offset;
-  var cdSize = 0;
-  centralDir.forEach(function(cd) { chunks.push(cd); cdSize += cd.length; });
-
-  var eocd = new Uint8Array(22);
-  var edv = new DataView(eocd.buffer);
-  edv.setUint32(0, 0x06054b50, true);
-  edv.setUint16(8, files.length, true);
-  edv.setUint16(10, files.length, true);
-  edv.setUint32(12, cdSize, true);
-  edv.setUint32(16, cdOffset, true);
-  chunks.push(eocd);
-
-  var blob = new Blob(chunks, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  var blob = new Blob([slk], { type: "application/vnd.ms-excel;charset=windows-1254;" });
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0, 10) + ".slk";
   a.click();
 }
-
 
 
 ciz();
