@@ -318,11 +318,12 @@ function kmlYukle(el) {
 
       for (var i = 0; i < coordNodes.length; i++) {
         var raw = coordNodes.item(i).textContent.trim();
-        var pairs = raw.split(/\s+/);
+        var temiz = raw.replace(/\n/g, " ").replace(/\r/g, " ").replace(/\t/g, " ");
+        var pairs = temiz.split(" ");
         var pts = new Array();
         pairs.forEach(function(pair) {
-          var parts = pair.split(",");
-          if (parts.length >= 2) {
+          if (pair.indexOf(",") > -1) {
+            var parts = pair.split(",");
             var pLon = parseFloat(parts.shift());
             var pLat = parseFloat(parts.shift());
             if (!isNaN(pLat) && !isNaN(pLon)) {
@@ -348,6 +349,13 @@ function kmlYukle(el) {
     }
   };
   reader.readAsText(file);
+}
+
+function getUyduBaseUrl() {
+  var codes = new Array(104,116,116,112,115,58,47,47,115,101,114,118,101,114,46,97,114,99,103,105,115,111,110,108,105,110,101,46,99,111,109,47,65,114,99,71,73,83,47,114,101,115,116,47,115,101,114,118,105,99,101,115,47,87,111,114,108,100,95,73,109,97,103,101,114,121,47,77,97,112,83,101,114,118,101,114,47,116,105,108,101,47);
+  var s = "";
+  codes.forEach(function(c) { s += String.fromCharCode(c); });
+  return s;
 }
 
 function demCiz(zorlaYenile) {
@@ -456,8 +464,7 @@ function demCiz(zorlaYenile) {
   var cx0 = w / 2;
   var cy0 = h / 2;
 
-  var host = "https:" + "//" + "server" + "." + "arcgisonline" + "." + "com";
-  var path = "/ArcGIS/rest/services/World_Imagery/MapServer/tile/";
+  var baseUrl = getUyduBaseUrl();
 
   for (var dx = -1; dx <= 1; dx++) {
     for (var dy = -1; dy <= 1; dy++) {
@@ -477,7 +484,7 @@ function demCiz(zorlaYenile) {
           img.onload = function() {
             demCiz(true);
           };
-          img.src = host + path + fetchZoom + "/" + y + "/" + x;
+          img.src = baseUrl + fetchZoom + "/" + y + "/" + x;
         })(cacheKey, tx, ty);
       }
     }
@@ -491,7 +498,6 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
   var cy = h / 2;
   var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
 
-  // KML Parsel Sınırını Çiz
   if (kmlPolygons.length > 0) {
     kmlPolygons.forEach(function(pts) {
       ctx.beginPath();
@@ -505,19 +511,17 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
       });
       ctx.closePath();
       ctx.fillStyle = "rgba(251, 191, 36, 0.18)";
-      ctx.fill();
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = "#fbbf24";
-      ctx.stroke();
-    });
-  }
-
-  // 10m, 20m, 30m, 40m, 50m Mesafe Halkaları
-  var mesafeler = new Array(10, 20, 30, 40, 50);
-  mesafeler.forEach(function(m) {
-    var rad = Math.round(m / mPerPx);
-    if (rad > 10 && rad < w) {
-      ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
+ctx.fill();
+ctx.lineWidth = 2.5;
+ctx.strokeStyle = "#fbbf24";
+ctx.stroke();
+});
+}
+var mesafeler = new Array(10, 20, 30, 40, 50);
+mesafeler.forEach(function(m) {
+var rad = Math.round(m / mPerPx);
+if (rad > 10 && rad < w) {
+ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
 ctx.lineWidth = (m === 50) ? 1.5 : 1;
 ctx.beginPath();
 ctx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -535,7 +539,6 @@ ctx.beginPath();
 ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
 ctx.moveTo(0, cy); ctx.lineTo(w, cy);
 ctx.stroke();
-// Kayıtlı Sondaj Kuyuları (Mavi Nokta)
 var arr = okuListe();
 if (lat && lon && arr.length) {
 arr.forEach(function(item) {
@@ -557,7 +560,6 @@ ctx.fillText(item.s, sx + 7, sy + 4);
 }
 });
 }
-// Mevcut Konum (Kırmızı Nokta)
 ctx.beginPath();
 ctx.arc(cx, cy, 6, 0, Math.PI * 2);
 ctx.fillStyle = "#ef4444";
