@@ -16,6 +16,8 @@ button{border:none;border-radius:8px;font-weight:700;cursor:pointer}
 .btn-gps{background:#f59e0b;color:#020617;padding:10px 12px}
 .btn-save{width:100%;background:#059669;color:#fff;padding:13px;font-size:15px}
 .btn-csv{background:#0f172a;color:#fbbf24;padding:8px 10px;font-size:12px}
+.hgt-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;background:#0f172a;padding:8px 10px;border-radius:8px;border:1px solid #334155}
+#demCanvas{width:100%;height:200px;background:#090d16;border-radius:8px;border:1px solid #334155;display:block}
 .rec{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;display:flex;gap:10px;margin-top:8px}
 .rec img{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #fbbf24}
 </style>
@@ -26,16 +28,27 @@ button{border:none;border-radius:8px;font-weight:700;cursor:pointer}
 <button type="button" class="btn-csv" onclick="csvIndir()">Excel (CSV)</button>
 </header>
 
+<!-- OTOMATİK .HGT TOPOĞRAFYA VE KOT KARTI -->
+<div class="card">
+<div class="hgt-bar">
+<span id="hgtSt" style="font-size:11px;color:#38bdf8">DEM Kot Verisi: Konum bekleniyor...</span>
+</div>
+<canvas id="demCanvas"></canvas>
+</div>
+
+<!-- GPS KARTI -->
 <div class="card" style="display:flex;justify-content:space-between;align-items:center">
 <div style="font-size:13px;line-height:1.6">
 Enlem: <b id="latV" style="color:#fbbf24">-</b><br>
 Boylam: <b id="lonV" style="color:#fbbf24">-</b><br>
+Kot (Rakım): <b id="altV" style="color:#38bdf8">-</b><br>
 Hassasiyet: <b id="accV" style="color:#34d399">-</b><br>
-<span id="stV" style="font-size:11px;color:#38bdf8">Konum alınıyor...</span>
+<span id="stV" style="font-size:11px;color:#38bdf8">Uydulara bağlanılıyor...</span>
 </div>
 <button type="button" class="btn-gps" onclick="konumAl()">Konum Al</button>
 </div>
 
+<!-- SONDAJ FORMU -->
 <div class="card">
 <div class="row">
 <div><label>Ada / Parsel *</label><input id="pIn" placeholder="104 / 12"></div>
@@ -58,10 +71,153 @@ Hassasiyet: <b id="accV" style="color:#34d399">-</b><br>
 <canvas id="cvs" style="display:none"></canvas>
 
 <script>
-var lat = "", lon = "", acc = "", fotoData = "";
+var lat = "", lon = "", acc = "", kot = "-", fotoData = "";
 var KEY = "sondaj_db_final";
-
 var watchId = null;
+var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
+
+function otomatikHgtGetir(la, lo) {
+  var bLat = Math.floor(la);
+  var bLon = Math.floor(lo);
+  var latPrefix = bLat >= 0 ? "N" : "S";
+  var lonPrefix = bLon >= 0 ? "E" : "W";
+  var latStr = String(Math.abs(bLat)).padStart(2, "0");
+  var lonStr = String(Math.abs(bLon)).padStart(3, "0");
+  var fileName = latPrefix + latStr + lonPrefix + lonStr + ".hgt";
+
+  if (loadedTileName === fileName) {
+    kotHesapla(la, lo);
+    return;
+  }
+  loadedTileName = fileName;
+  document.getElementById("hgtSt").innerText = "Yükleniyor: " + fileName + "...";
+
+  fetch(fileName)
+    .then(function(res) {
+      if (!res.ok) throw new Error("Dosya bulunamadı");
+      return res.arrayBuffer();
+    })
+    .then(function(buf) {
+      hgtBaseLat = bLat;
+      hgtBaseLon = bLon;
+      var totalSamples = buf.byteLength / 2;
+      hgtSize = Math.round(Math.sqrt(totalSamples));
+      hgtView = new DataView(buf);
+      document.getElementById("hgtSt").innerText = "✓ Aktif DEM: " + fileName;
+      document.getElementById("hgtSt").style.color = "#34d399";
+      kotHesapla(la, lo);
+      demCiz();
+    })
+    .catch(function() {
+      loadedTileName = "";
+      document.getElementById("hgtSt").innerText = "Not: Depoda " + fileName + " bulunamadı (GPS kotu kullanılıyor)";
+      document.getElementById("hgtSt").style.color = "#94a3b8";
+    });
+}
+
+function hgtKotOku(la, lo) {
+  if (!hgtView || !hgtSize) return null;
+  var dLat = la - hgtBaseLat;
+  var dLon = lo - hgtBaseLon;
+  if (dLat < 0 || dLat > 1 || dLon < 0 || dLon > 1) return null;
+  var row = Math.round((1 - dLat) * (hgtSize - 1));
+  var col = Math.round(dLon * (hgtSize - 1));
+  var idx = (row * hgtSize + col) * 2;
+  if (idx < 0 || idx + 1 >= hgtView.byteLength) return null;
+  var val = hgtView.getInt16(idx, false);
+  return val < -1000 ? null : val;
+}
+
+function kotHesapla(la, lo) {
+  var z = hgtKotOku(la, lo);
+  if (z !== null) {
+    kot = z + " m";
+    document.getElementById("altV").innerText = kot;
+  }
+}
+
+function demCiz() {
+  var c = document.getElementById("demCanvas");
+  var w = c.parentElement.clientWidth - 24;
+  if (w < 200) w = 320;
+  c.width = w; c.height = 200;
+  var ctx = c.getContext("2d");
+  ctx.fillStyle = "#090d16";
+  ctx.fillRect(0, 0, w, 200);
+
+  if (hgtView && lat && lon) {
+    var cLat = parseFloat(lat), cLon = parseFloat(lon);
+    var span = 0.015;
+    var step = 4;
+    var minZ = 9999, maxZ = -9999;
+    var grid = new Array();
+
+    for (var py = 0; py < 200; py += step) {
+      for (var px = 0; px < w; px += step) {
+        var gLat = cLat + (0.5 - py / 200) * span;
+        var gLon = cLon + (px / w - 0.5) * span;
+        var z = hgtKotOku(gLat, gLon);
+        if (z !== null) {
+          if (z < minZ) minZ = z;
+          if (z > maxZ) maxZ = z;
+        }
+        grid.push({ px: px, py: py, z: z });
+      }
+    }
+
+    var diff = (maxZ - minZ) || 1;
+    grid.forEach(function(cell) {
+      if (cell.z !== null) {
+        var ratio = (cell.z - minZ) / diff;
+        var r = Math.round(30 + ratio * 180);
+        var g = Math.round(90 + (1 - Math.abs(ratio - 0.5)) * 110);
+        var b = Math.round(50 + (1 - ratio) * 90);
+        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+        ctx.fillRect(cell.px, cell.py, step, step);
+      }
+    });
+
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(6, 6, 155, 22);
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "bold 11px monospace";
+    ctx.fillText("Kot: " + minZ + "m - " + maxZ + "m", 12, 20);
+  } else {
+    ctx.strokeStyle = "#1e293b";
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, 200);
+    ctx.moveTo(0, 100); ctx.lineTo(w, 100);
+    ctx.stroke();
+  }
+
+  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+  if (lat && lon && arr.length) {
+    var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
+    var span2 = 0.015;
+    arr.forEach(function(item) {
+      var sx = ((parseFloat(item.lon) - cLon2) / span2 + 0.5) * w;
+      var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * 200;
+      if (sx >= 0 && sx <= w && sy >= 0 && sy <= 200) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 10px sans-serif";
+        ctx.fillText(item.s, sx + 7, sy + 3);
+      }
+    });
+  }
+
+  ctx.beginPath();
+  ctx.arc(w / 2, 100, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+}
+
 function konumAl() {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   document.getElementById("stV").innerText = "Uydulara bağlanılıyor...";
@@ -73,13 +229,19 @@ function konumAl() {
     document.getElementById("latV").innerText = lat;
     document.getElementById("lonV").innerText = lon;
     document.getElementById("accV").innerText = acc;
+    if (p.coords.altitude && !hgtView) {
+      kot = Math.round(p.coords.altitude) + " m (GPS)";
+      document.getElementById("altV").innerText = kot;
+    }
+    otomatikHgtGetir(parseFloat(lat), parseFloat(lon));
     document.getElementById("stV").innerText = m <= 10 ? "● GPS Kilitlendi (Yüksek Hassasiyet)" : "● Canlı takip (Hassasiyet iyileştiriliyor...)";
+    demCiz();
   }, function(e) {
     document.getElementById("stV").innerText = "Hata: " + e.message;
   }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
 }
 konumAl();
-
+demCiz();
 
 function fotoIsle(el) {
   if (!el.files || !el.files.length) return;
@@ -93,104 +255,98 @@ function fotoIsle(el) {
       if (w > 700) { h = Math.round(h * 700 / w); w = 700; }
       c.width = w; c.height = h;
       ctx.drawImage(img, 0, 0, w, h);
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
+      ctx.fillStyle = "rgba(0,0,0,0.82)";
       ctx.fillRect(0, h - 54, w, 54);
       ctx.fillStyle = "#fbbf24";
-      ctx.font = "bold 14px sans-serif";
-      var p = document.getElementById("pIn").value || "-";
-      var s = document.getElementById("sIn").value || "-";
-      ctx.fillText("Parsel: " + p + " | " + s + " | " + new Date().toLocaleString("tr-TR"), 10, h - 32);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText("Koordinat: " + (lat || "-") + ", " + (lon || "-") + " (" + (acc || "-") + ")", 10, h - 12);
-      fotoData = c.toDataURL("image/jpeg", 0.65);
-      var pr = document.getElementById("prev");
-      pr.src = fotoData;
-      pr.style.display = "block";
-    };
-    img.src = ev.target.result;
-  };
-  r.readAsDataURL(el.files.item(0));
+      ctx.font = "bold 13px sans-serif";
+var p = document.getElementById("pIn").value || "-";
+var s = document.getElementById("sIn").value || "-";
+ctx.fillText("Parsel: " + p + " | " + s + " | Kot: " + kot + " | " + new Date().toLocaleString("tr-TR"), 10, h - 32);
+ctx.fillStyle = "#ffffff";
+ctx.fillText("Koordinat: " + (lat || "-") + ", " + (lon || "-") + " (" + (acc || "-") + ")", 10, h - 12);
+fotoData = c.toDataURL("image/jpeg", 0.65);
+var pr = document.getElementById("prev");
+pr.src = fotoData;
+pr.style.display = "block";
+};
+img.src = ev.target.result;
+};
+r.readAsDataURL(el.files.item(0));
 }
-
 function kaydet() {
-  var p = document.getElementById("pIn").value.trim();
-  var s = document.getElementById("sIn").value.trim();
-  if (!p || !s) { alert("Ada/Parsel ve Sondaj No girin."); return; }
-  if (!lat) { alert("Önce Konum Al butonuna basın."); return; }
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
-  arr.unshift({
-    id: Date.now(), p: p, s: s,
-    d: document.getElementById("dIn").value,
-    w: document.getElementById("wIn").value,
-    n: document.getElementById("nIn").value,
-    lat: lat, lon: lon, acc: acc,
-    t: new Date().toLocaleString("tr-TR"),
-    f: fotoData
-  });
-  localStorage.setItem(KEY, JSON.stringify(arr));
-  document.getElementById("pIn").value = "";
-  document.getElementById("sIn").value = "";
-  document.getElementById("dIn").value = "";
-  document.getElementById("wIn").value = "";
-  document.getElementById("nIn").value = "";
-  document.getElementById("fIn").value = "";
-  document.getElementById("prev").style.display = "none";
-  fotoData = "";
-  ciz();
-  alert("Kaydedildi!");
+var p = document.getElementById("pIn").value.trim();
+var s = document.getElementById("sIn").value.trim();
+if (!p || !s) { alert("Ada/Parsel ve Sondaj No girin."); return; }
+if (!lat) { alert("Önce Konum Al butonuna basın."); return; }
+var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+arr.unshift({
+id: Date.now(), p: p, s: s,
+d: document.getElementById("dIn").value,
+w: document.getElementById("wIn").value,
+n: document.getElementById("nIn").value,
+lat: lat, lon: lon, kot: kot, acc: acc,
+t: new Date().toLocaleString("tr-TR"),
+f: fotoData
+});
+localStorage.setItem(KEY, JSON.stringify(arr));
+document.getElementById("pIn").value = "";
+document.getElementById("sIn").value = "";
+document.getElementById("dIn").value = "";
+document.getElementById("wIn").value = "";
+document.getElementById("nIn").value = "";
+document.getElementById("fIn").value = "";
+document.getElementById("prev").style.display = "none";
+fotoData = "";
+ciz();
+demCiz();
+alert("Kaydedildi!");
 }
-
 function ciz() {
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
-  document.getElementById("cnt").innerText = arr.length;
-  var box = document.getElementById("list");
-  box.innerHTML = "";
-  arr.forEach(function(x) {
-    var div = document.createElement("div");
-    div.className = "rec";
-    var im = x.f ? '<img src="' + x.f + '" onclick="indir(' + x.id + ')">' : '';
-    div.innerHTML = im + '<div style="flex:1;font-size:12px">' +
-      '<div style="display:flex;justify-content:space-between;color:#fbbf24;font-weight:700"><span>' + x.s + ' (' + x.p + ')</span>' +
-      '<button type="button" onclick="sil(' + x.id + ')" style="background:none;color:#f87171">Sil</button></div>' +
-      '<div>' + x.lat + ', ' + x.lon + '</div>' +
-      '<div style="color:#94a3b8">Derinlik: ' + (x.d || '-') + 'm | YAS: ' + (x.w || '-') + 'm</div>' +
-      '<div style="font-size:10px;color:#64748b">' + x.t + '</div></div>';
-    box.appendChild(div);
-  });
+var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+document.getElementById("cnt").innerText = arr.length;
+var box = document.getElementById("list");
+box.innerHTML = "";
+arr.forEach(function(x) {
+var div = document.createElement("div");
+div.className = "rec";
+var im = x.f ? '' : '';
+div.innerHTML = im + '' +
+'' + x.s + ' (' + x.p + ')' +
+'Sil' +
+'' + x.lat + ', ' + x.lon + ' | Kot: ' + (x.kot || '-') + '' +
+'Derinlik: ' + (x.d || '-') + 'm | YAS: ' + (x.w || '-') + 'm' +
+'' + x.t + '';
+box.appendChild(div);
+});
 }
-
 function sil(id) {
-  if (!confirm("Silinsin mi?")) return;
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]").filter(function(x) { return x.id !== id; });
-  localStorage.setItem(KEY, JSON.stringify(arr));
-  ciz();
+if (!confirm("Silinsin mi?")) return;
+var arr = JSON.parse(localStorage.getItem(KEY) || "[]").filter(function(x) { return x.id !== id; });
+localStorage.setItem(KEY, JSON.stringify(arr));
+ciz();
+demCiz();
 }
-
 function indir(id) {
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
-  arr.forEach(function(x) {
-    if (x.id === id && x.f) {
-      var a = document.createElement("a");
-      a.href = x.f;
-      a.download = x.p + "_" + x.s + ".jpg";
-      a.click();
-    }
-  });
+var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+arr.forEach(function(x) {
+if (x.id === id && x.f) {
+var a = document.createElement("a");
+a.href = x.f;
+a.download = x.p + "_" + x.s + ".jpg";
+a.click();
 }
-
+});
+}
 function csvIndir() {
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
-  if (!arr.length) { alert("Kayıt yok"); return; }
-  var csv = "\uFEFFParsel;Sondaj;Enlem;Boylam;Hassasiyet;Derinlik;YAS;Not;Tarih\n";
-  arr.forEach(function(x) {
-    csv += x.p + ";" + x.s + ";" + x.lat + ";" + x.lon + ";" + x.acc + ";" + x.d + ";" + x.w + ";" + x.n + ";" + x.t + "\n";
-  });
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-  a.download = "Sondajlar.csv";
-  a.click();
+var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+if (!arr.length) { alert("Kayıt yok"); return; }
+var csv = "\uFEFFParsel;Sondaj;Enlem;Boylam;Kot;Hassasiyet;Derinlik;YAS;Not;Tarih\n";
+arr.forEach(function(x) {
+csv += x.p + ";" + x.s + ";" + x.lat + ";" + x.lon + ";" + (x.kot || "-") + ";" + x.acc + ";" + x.d + ";" + x.w + ";" + x.n + ";" + x.t + "\n";
+});
+var a = document.createElement("a");
+a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+a.download = "Sondajlar.csv";
+a.click();
 }
 ciz();
-</script>
-</body>
-</html>
