@@ -284,7 +284,7 @@ var listEl = document.getElementById('recordsList');
 var liste = kayitlariGetir();
 document.getElementById('count').innerText = liste.length;
 listEl.innerHTML = "";
-liste.forEach(function(r, idx) {
+liste.forEach(function(r) {
 var card = document.createElement('div');
 card.className = "rec-item";
 var imgHtml = r.photo
@@ -307,9 +307,9 @@ var liste = kayitlariGetir().filter(function(r) { return r.id !== id; });
 kayitlariSakla(liste);
 listeyiCiz();
 }
-function fotoIndir(idx) {
+function fotoIndirId(id) {
 var liste = kayitlariGetir();
-var r = liste.at(idx);
+var r = liste.find(function(item) { return item.id === id; });
 if (!r || !r.photo) return;
 var a = document.createElement('a');
 a.href = r.photo;
