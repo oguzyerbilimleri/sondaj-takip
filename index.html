@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Saha Sondaj Takip</title>
+  <script src="https://cloudflare.com"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif}
 body{background:#0f172a;color:#f1f5f9;padding:12px 12px 60px}
@@ -230,34 +231,62 @@ function csvIndir() {
   var arr = okuListe();
   if (!arr.length) { alert("Kayıt yok"); return; }
 
-  var bom = String.fromCharCode(65279);
-  var csv = bom + "Ada / Parsel;Sondaj No;Enlem (Lat);Boylam (Lon);Kot (Rakım);Hassasiyet;Derinlik (m);YAS (m);Saha Notu;Tarih / Saat\n";
+  var basliklar = new Array(
+    "Ada / Parsel",
+    "Sondaj No",
+    "Enlem (Lat)",
+    "Boylam (Lon)",
+    "Kot (Rakım)",
+    "Hassasiyet",
+    "Derinlik (m)",
+    "YAS (m)",
+    "Saha Notu",
+    "Tarih / Saat"
+  );
+
+  var satirlar = new Array();
+  satirlar.push(basliklar);
 
   arr.forEach(function(x) {
     var derStr = x.d ? (x.d + " m") : "-";
     var yasStr = x.w ? (x.w + " m") : "-";
-    var enlem = x.lat ? ('="' + x.lat + '"') : "-";
-    var boylam = x.lon ? ('="' + x.lon + '"') : "-";
-    var tarih = x.t ? ('="' + x.t + '"') : "-";
-
-    csv += '"' + (x.p || "-") + '";' +
-           '"' + (x.s || "-") + '";' +
-           enlem + ';' +
-           boylam + ';' +
-           '"' + (x.kot || "-") + '";' +
-           '"' + (x.acc || "-") + '";' +
-           '"' + derStr + '";' +
-           '"' + yasStr + '";' +
-           '"' + (x.n || "-") + '";' +
-           tarih + '\n';
+    satirlar.push(new Array(
+      String(x.p || "-"),
+      String(x.s || "-"),
+      String(x.lat || "-"),
+      String(x.lon || "-"),
+      String(x.kot || "-"),
+      String(x.acc || "-"),
+      derStr,
+      yasStr,
+      String(x.n || "-"),
+      String(x.t || "-")
+    ));
   });
 
-  var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0, 10) + ".csv";
-  a.click();
+  if (typeof XLSX !== "undefined") {
+    var ws = XLSX.utils.aoa_to_sheet(satirlar);
+
+    // Her sütunun genişliğini içindeki en uzun metne göre otomatik hesapla (+5 karakter boşluk)
+    var colWidths = new Array();
+    for (var c = 0; c < basliklar.length; c++) {
+      var maxLen = basliklar.at(c).length;
+      satirlar.forEach(function(row) {
+        var val = String(row.at(c) || "");
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      colWidths.push({ wch: maxLen + 5 });
+    }
+    ws["!cols"] = colWidths;
+
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sondaj Listesi");
+    XLSX.writeFile(wb, "Sondaj_Listesi_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+  } else {
+    alert("Excel kütüphanesi yüklenemedi, internet bağlantınızı kontrol edip sayfayı yenileyin.");
+  }
 }
+
 
 
 ciz();
