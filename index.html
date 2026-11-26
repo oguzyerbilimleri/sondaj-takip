@@ -222,14 +222,15 @@ function csvIndir() {
 ciz();
 </script>
 
-<!-- 2. BAĞIMSIZ BLOK: UYDU + KML PARSEL SINIRI + ZOOM + .HGT KOT -->
+<!-- 2. BAĞIMSIZ BLOK: NET UYDU + KML ODAKLAMA + ZOOM + .HGT KOT -->
 <script>
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
-var uyduZoom = 18;
+var uyduZoom = 17;
 var uyduAktif = true;
 var tileCache = {};
 var sonCizilenLat = null, sonCizilenLon = null, sonCizilenZoom = null;
 var kmlPolygons = new Array();
+var hedefLat = null, hedefLon = null;
 
 function hgtGuncelle(la, lo) {
   var st = document.getElementById("hgtSt");
@@ -263,13 +264,17 @@ function hgtGuncelle(la, lo) {
       kot = Math.round(z2) + " m";
       document.getElementById("altV").innerText = kot;
     }
-    st.innerText = "✓ Uydu + DEM (" + fileName + ") | Kot: " + kot;
-    st.style.color = "#34d399";
+    if (kmlPolygons.length === 0) {
+      st.innerText = "✓ Uydu + DEM (" + fileName + ") | Kot: " + kot;
+      st.style.color = "#34d399";
+    }
     demCiz(true);
   }).catch(function() {
     loadedTileName = "";
-    st.innerText = "✓ Uydu + Saha Krokisi Aktif";
-    st.style.color = "#34d399";
+    if (kmlPolygons.length === 0) {
+      st.innerText = "✓ Uydu + Saha Krokisi Aktif";
+      st.style.color = "#34d399";
+    }
     demCiz(false);
   });
 }
@@ -316,6 +321,8 @@ function kmlYukle(el) {
       var coordNodes = xmlDoc.getElementsByTagName("coordinates");
       kmlPolygons = new Array();
 
+      var minLat = 999, maxLat = -999, minLon = 999, maxLon = -999;
+
       for (var i = 0; i < coordNodes.length; i++) {
         var raw = coordNodes.item(i).textContent.trim();
         var temiz = raw.replace(/\n/g, " ").replace(/\r/g, " ").replace(/\t/g, " ");
@@ -328,6 +335,10 @@ function kmlYukle(el) {
             var pLat = parseFloat(parts.shift());
             if (!isNaN(pLat) && !isNaN(pLon)) {
               pts.push({ lat: pLat, lon: pLon });
+              if (pLat < minLat) minLat = pLat;
+              if (pLat > maxLat) maxLat = pLat;
+              if (pLon < minLon) minLon = pLon;
+              if (pLon > maxLon) maxLon = pLon;
             }
           }
         });
@@ -337,8 +348,13 @@ function kmlYukle(el) {
       }
 
       if (kmlPolygons.length > 0) {
+        // Harita merkezini otomatik olarak parselin ortasına kilitle
+        hedefLat = (minLat + maxLat) / 2;
+        hedefLon = (minLon + maxLon) / 2;
+        uyduZoom = 17;
+
         var st = document.getElementById("hgtSt");
-        st.innerText = "✓ KML Parsel Yüklendi (" + kmlPolygons.length + " alan)";
+        st.innerText = "✓ KML Parsel Odaklandı (" + kmlPolygons.length + " alan)";
         st.style.color = "#fbbf24";
         demCiz(true);
       } else {
@@ -400,6 +416,17 @@ function demCiz(zorlaYenile) {
     zBox.id = "mapZoomBox";
     zBox.style.cssText = "position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:6px;z-index:25;";
 
+    var bLoc = document.createElement("button");
+    bLoc.type = "button";
+    bLoc.innerText = "◎";
+    bLoc.title = "Konumuma Odaklan";
+    bLoc.style.cssText = "width:36px;height:36px;background:rgba(15,23,42,0.88);color:#38bdf8;border:1px solid #475569;border-radius:8px;font-size:18px;font-weight:800;cursor:pointer;";
+    bLoc.onclick = function() {
+      hedefLat = null;
+      hedefLon = null;
+      demCiz(true);
+    };
+
     var bIn = document.createElement("button");
     bIn.type = "button";
     bIn.innerText = "+";
@@ -416,13 +443,14 @@ function demCiz(zorlaYenile) {
       if (uyduZoom > 13) { uyduZoom--; demCiz(true); }
     };
 
+    zBox.appendChild(bLoc);
     zBox.appendChild(bIn);
     zBox.appendChild(bOut);
     parent.appendChild(zBox);
   }
 
-  var cLat = lat ? parseFloat(lat) : 38.3569;
-  var cLon = lon ? parseFloat(lon) : 34.0240;
+  var cLat = hedefLat !== null ? hedefLat : (lat ? parseFloat(lat) : 38.3569);
+  var cLon = hedefLon !== null ? hedefLon : (lon ? parseFloat(lon) : 34.0240);
 
   if (!zorlaYenile && sonCizilenLat !== null && sonCizilenZoom === uyduZoom) {
     var fark = Math.abs(cLat - sonCizilenLat) + Math.abs(cLon - sonCizilenLon);
@@ -434,7 +462,7 @@ function demCiz(zorlaYenile) {
 
   var w = parent.clientWidth - 24;
   if (w < 200) w = 320;
-  var h = 235;
+  var h = 245;
   if (c.width !== w || c.height !== h) {
     c.width = w;
     c.height = h;
@@ -475,48 +503,51 @@ function demCiz(zorlaYenile) {
       var cacheKey = fetchZoom + "_" + tx + "_" + ty;
 
       if (tileCache[cacheKey] && tileCache[cacheKey].complete) {
-        ctx.drawImage(tileCache[cacheKey], px, py, tileDrawSize, tileDrawSize);
-      } else if (!tileCache[cacheKey]) {
-        (function(k, x, y) {
-          var img = new Image();
-          img.crossOrigin = "anonymous";
-          tileCache[k] = img;
-          img.onload = function() {
-            demCiz(true);
-          };
-          img.src = baseUrl + fetchZoom + "/" + y + "/" + x;
-        })(cacheKey, tx, ty);
-      }
-    }
-  }
-
-  katmanlariCiz(ctx, w, h, cLat, cLon);
+ctx.drawImage(tileCache[cacheKey], px, py, tileDrawSize, tileDrawSize);
+} else if (!tileCache[cacheKey]) {
+(function(k, x, y) {
+var img = new Image();
+img.crossOrigin = "anonymous";
+tileCache[k] = img;
+img.onload = function() {
+demCiz(true);
+};
+img.src = baseUrl + fetchZoom + "/" + y + "/" + x;
+})(cacheKey, tx, ty);
 }
-
+}
+}
+katmanlariCiz(ctx, w, h, cLat, cLon);
+}
 function katmanlariCiz(ctx, w, h, cLat, cLon) {
-  var cx = w / 2;
-  var cy = h / 2;
-  var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
-
-  if (kmlPolygons.length > 0) {
-    kmlPolygons.forEach(function(pts) {
-      ctx.beginPath();
-      pts.forEach(function(pt, idx) {
-        var dLatM = (pt.lat - cLat) * 111132;
-        var dLonM = (pt.lon - cLon) * 111320 * Math.cos(cLat * Math.PI / 180);
-        var px = cx + (dLonM / mPerPx);
-        var py = cy - (dLatM / mPerPx);
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.closePath();
-      ctx.fillStyle = "rgba(251, 191, 36, 0.18)";
+var cx = w / 2;
+var cy = h / 2;
+var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
+// KML Parsel Sınırını Çiz
+if (kmlPolygons.length > 0) {
+kmlPolygons.forEach(function(pts) {
+ctx.beginPath();
+pts.forEach(function(pt, idx) {
+var dLatM = (pt.lat - cLat) * 111132;
+var dLonM = (pt.lon - cLon) * 111320 * Math.cos(cLat * Math.PI / 180);
+var px = cx + (dLonM / mPerPx);
+var py = cy - (dLatM / mPerPx);
+if (idx === 0) ctx.moveTo(px, py);
+else ctx.lineTo(px, py);
+});
+ctx.closePath();
+ctx.fillStyle = "rgba(251, 191, 36, 0.20)";
 ctx.fill();
 ctx.lineWidth = 2.5;
 ctx.strokeStyle = "#fbbf24";
 ctx.stroke();
 });
 }
+// Kullanıcının Gerçek Konumu (Kırmızı Nokta + 10m-50m Halkaları)
+var uLat = lat ? parseFloat(lat) : cLat;
+var uLon = lon ? parseFloat(lon) : cLon;
+var uX = cx + (((uLon - cLon) * 111320 * Math.cos(cLat * Math.PI / 180)) / mPerPx);
+var uY = cy - (((uLat - cLat) * 111132) / mPerPx);
 var mesafeler = new Array(10, 20, 30, 40, 50);
 mesafeler.forEach(function(m) {
 var rad = Math.round(m / mPerPx);
@@ -524,23 +555,18 @@ if (rad > 10 && rad < w) {
 ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
 ctx.lineWidth = (m === 50) ? 1.5 : 1;
 ctx.beginPath();
-ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+ctx.arc(uX, uY, rad, 0, Math.PI * 2);
 ctx.stroke();
 ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
-ctx.fillRect(cx + rad - 13, cy - 13, 26, 12);
+ctx.fillRect(uX + rad - 13, uY - 13, 26, 12);
 ctx.fillStyle = (m === 50) ? "#fbbf24" : "#f1f5f9";
 ctx.font = "bold 9px sans-serif";
-ctx.fillText(m + "m", cx + rad - 10, cy - 4);
+ctx.fillText(m + "m", uX + rad - 10, uY - 4);
 }
 });
-ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-ctx.lineWidth = 1;
-ctx.beginPath();
-ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
-ctx.moveTo(0, cy); ctx.lineTo(w, cy);
-ctx.stroke();
+// Kayıtlı Sondaj Kuyuları (Mavi Nokta)
 var arr = okuListe();
-if (lat && lon && arr.length) {
+if (arr.length) {
 arr.forEach(function(item) {
 var dLatM = (parseFloat(item.lat) - cLat) * 111132;
 var dLonM = (parseFloat(item.lon) - cLon) * 111320 * Math.cos(cLat * Math.PI / 180);
@@ -560,8 +586,9 @@ ctx.fillText(item.s, sx + 7, sy + 4);
 }
 });
 }
+// Mevcut Konum (Kırmızı Nokta)
 ctx.beginPath();
-ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+ctx.arc(uX, uY, 6, 0, Math.PI * 2);
 ctx.fillStyle = "#ef4444";
 ctx.fill();
 ctx.lineWidth = 2;
@@ -571,7 +598,6 @@ ctx.stroke();
 if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
 else { demCiz(true); }
 </script>
-
 
 
 
