@@ -222,7 +222,7 @@ function csvIndir() {
 ciz();
 </script>
 
-<!-- 2. BAĞIMSIZ BLOK: .HGT OTOMATİK KOT VE TOPOĞRAFYA HARİTASI -->
+<!-- 2. BAĞIMSIZ BLOK: .HGT OTOMATİK KOT VE 3B İZOHİPS HARİTASI -->
 <script>
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 
@@ -237,7 +237,7 @@ function hgtGuncelle(la, lo) {
   if (loadedTileName === fileName && hgtView) {
     var z = hgtKotOku(la, lo);
     if (z !== null) {
-      kot = z + " m";
+      kot = Math.round(z) + " m";
       document.getElementById("altV").innerText = kot;
     }
     demCiz();
@@ -255,11 +255,11 @@ function hgtGuncelle(la, lo) {
     hgtBaseLon = bLon;
     hgtSize = Math.round(Math.sqrt(buf.byteLength / 2));
     hgtView = new DataView(buf);
-    st.innerText = "✓ Aktif DEM: " + fileName;
+    st.innerText = "✓ Aktif DEM: " + fileName + " (3B Kabartma & İzohips)";
     st.style.color = "#34d399";
     var z2 = hgtKotOku(la, lo);
     if (z2 !== null) {
-      kot = z2 + " m";
+      kot = Math.round(z2) + " m";
       document.getElementById("altV").innerText = kot;
     }
     demCiz();
@@ -271,95 +271,161 @@ function hgtGuncelle(la, lo) {
   });
 }
 
+function hgtHamOku(r, c) {
+  if (r < 0) r = 0;
+  if (c < 0) c = 0;
+  if (r >= hgtSize) r = hgtSize - 1;
+  if (c >= hgtSize) c = hgtSize - 1;
+  var idx = (r * hgtSize + c) * 2;
+  if (idx < 0 || idx + 1 >= hgtView.byteLength) return null;
+  var val = hgtView.getInt16(idx, false);
+  return val < -1000 ? null : val;
+}
+
+// Bilineer Enterpolasyon ile pürüzsüz kot okuma
 function hgtKotOku(la, lo) {
   if (!hgtView || !hgtSize) return null;
   var dLat = la - hgtBaseLat;
   var dLon = lo - hgtBaseLon;
   if (dLat < 0 || dLat > 1 || dLon < 0 || dLon > 1) return null;
-  var row = Math.round((1 - dLat) * (hgtSize - 1));
-  var col = Math.round(dLon * (hgtSize - 1));
-  var idx = (row * hgtSize + col) * 2;
-  if (idx < 0 || idx + 1 >= hgtView.byteLength) return null;
-  var val = hgtView.getInt16(idx, false);
-  return val < -1000 ? null : val;
+
+  var rFloat = (1 - dLat) * (hgtSize - 1);
+  var cFloat = dLon * (hgtSize - 1);
+  var r0 = Math.floor(rFloat);
+  var c0 = Math.floor(cFloat);
+  var dr = rFloat - r0;
+  var dc = cFloat - c0;
+
+  var z00 = hgtHamOku(r0, c0);
+  var z01 = hgtHamOku(r0, c0 + 1);
+  var z10 = hgtHamOku(r0 + 1, c0);
+  var z11 = hgtHamOku(r0 + 1, c0 + 1);
+
+  if (z00 === null || z01 === null || z10 === null || z11 === null) return z00;
+  var topZ = z00 * (1 - dc) + z01 * dc;
+  var botZ = z10 * (1 - dc) + z11 * dc;
+  return topZ * (1 - dr) + botZ * dr;
 }
 
 function demCiz() {
   var c = document.getElementById("demCanvas");
   var w = c.parentElement.clientWidth - 24;
   if (w < 200) w = 320;
+  var h = 210;
   c.width = w;
-  c.height = 190;
+  c.height = h;
   var ctx = c.getContext("2d");
   ctx.fillStyle = "#0b1120";
-  ctx.fillRect(0, 0, w, 190);
+  ctx.fillRect(0, 0, w, h);
 
   if (hgtView && lat && lon) {
     var cLat = parseFloat(lat), cLon = parseFloat(lon);
-    var span = 0.015;
-    var step = 4;
+    var span = 0.025; // Yaklaşık 2.5 km görüş alanı
+    var step = 2;
+    var cols = Math.ceil(w / step) + 1;
+    var rows = Math.ceil(h / step) + 1;
+    var zMat = new Array();
     var minZ = 9999, maxZ = -9999;
-    var grid = new Array();
 
-    for (var py = 0; py < 190; py += step) {
-      for (var px = 0; px < w; px += step) {
-        var gLat = cLat + (0.5 - py / 190) * span;
-        var gLon = cLon + (px / w - 0.5) * span;
+    for (var r = 0; r < rows; r++) {
+      var rowArr = new Array();
+      var gLat = cLat + (0.5 - (r * step) / h) * span;
+      for (var col = 0; col < cols; col++) {
+        var gLon = cLon + ((col * step) / w - 0.5) * span;
         var z = hgtKotOku(gLat, gLon);
         if (z !== null) {
           if (z < minZ) minZ = z;
           if (z > maxZ) maxZ = z;
         }
-        grid.push({ px: px, py: py, z: z });
+        rowArr.push(z);
       }
+      zMat.push(rowArr);
     }
 
     var diff = (maxZ - minZ) || 1;
-    grid.forEach(function(cell) {
-      if (cell.z !== null) {
-        var ratio = (cell.z - minZ) / diff;
-        var r = Math.round(30 + ratio * 180);
-        var g = Math.round(90 + (1 - Math.abs(ratio - 0.5)) * 110);
-        var b = Math.round(50 + (1 - ratio) * 90);
-        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
-        ctx.fillRect(cell.px, cell.py, step, step);
-      }
-    });
+    for (var r2 = 0; r2 < rows - 1; r2++) {
+      var curRow = zMat.at(r2);
+      var nextRow = zMat.at(r2 + 1);
+      for (var col2 = 0; col2 < cols - 1; col2++) {
+        var zc = curRow.at(col2);
+        var zr = curRow.at(col2 + 1);
+        var zd = nextRow.at(col2);
+        if (zc === null) continue;
 
-    ctx.fillStyle = "rgba(0,0,0,0.65)";
-    ctx.fillRect(6, 6, 155, 22);
+        // 3B Güneş Gölgelendirme (Hillshade - Kuzeybatı ışığı)
+        var dzdx = (zr !== null ? zr - zc : 0);
+        var dzdy = (zd !== null ? zd - zc : 0);
+        var shade = 1.0 + (-dzdx - dzdy) * 0.18;
+        if (shade < 0.55) shade = 0.55;
+        if (shade > 1.45) shade = 1.45;
+
+        var ratio = (zc - minZ) / diff;
+        var red = Math.min(255, Math.round((45 + ratio * 175) * shade));
+        var grn = Math.min(255, Math.round((105 + (1 - Math.abs(ratio - 0.45)) * 95) * shade));
+        var blu = Math.min(255, Math.round((65 + (1 - ratio) * 75) * shade));
+
+        ctx.fillStyle = "rgb(" + red + "," + grn + "," + blu + ")";
+        ctx.fillRect(col2 * step, r2 * step, step, step);
+
+        // 5 Metrelik İzohips (Eşyükselti) Eğrisi Çizimi
+        if (zr !== null && zd !== null) {
+          var isoStep = 5;
+          var b0 = Math.floor(zc / isoStep);
+          var br = Math.floor(zr / isoStep);
+          var bd = Math.floor(zd / isoStep);
+          if (b0 !== br || b0 !== bd) {
+            ctx.fillStyle = (b0 % 4 === 0) ? "rgba(255, 255, 255, 0.55)" : "rgba(15, 23, 42, 0.45)";
+            ctx.fillRect(col2 * step, r2 * step, step, step);
+          }
+        }
+      }
+    }
+
+    // Kot Bilgisi ve Ölçek Çubuğu
+    ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
+    ctx.fillRect(8, 8, 195, 22);
     ctx.fillStyle = "#fbbf24";
     ctx.font = "bold 11px monospace";
-    ctx.fillText("Kot: " + minZ + "m - " + maxZ + "m", 12, 20);
+    ctx.fillText("Kot: " + Math.round(minZ) + "m - " + Math.round(maxZ) + "m (İzohips: 5m)", 14, 22);
+
+    ctx.fillRect(w - 86, h - 24, 78, 18);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText("◄ 500 m ►", w - 74, h - 11);
   } else {
     ctx.strokeStyle = "#334155";
     ctx.beginPath();
-    ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, 190);
-    ctx.moveTo(0, 95); ctx.lineTo(w, 95);
+    ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+    ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
     ctx.stroke();
   }
 
+  // Kayıtlı Sondaj Kuyuları (Mavi Noktalar)
   var arr = okuListe();
   if (lat && lon && arr.length) {
     var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
-    var span2 = 0.015;
+    var span2 = 0.025;
     arr.forEach(function(item) {
       var sx = ((parseFloat(item.lon) - cLon2) / span2 + 0.5) * w;
-      var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * 190;
-      if (sx >= 0 && sx <= w && sy >= 0 && sy <= 190) {
+      var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * h;
+      if (sx >= 0 && sx <= w && sy >= 0 && sy <= h) {
         ctx.beginPath();
         ctx.arc(sx, sy, 5, 0, Math.PI * 2);
         ctx.fillStyle = "#38bdf8";
         ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "#0f172a";
+        ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 10px sans-serif";
-        ctx.fillText(item.s, sx + 7, sy + 3);
+        ctx.font = "bold 11px sans-serif";
+        ctx.fillText(item.s, sx + 7, sy + 4);
       }
     });
   }
 
+  // Mevcut Konum (Kırmızı Nokta)
   ctx.beginPath();
-  ctx.arc(w / 2, 95, 6, 0, Math.PI * 2);
+  ctx.arc(w / 2, h / 2, 6, 0, Math.PI * 2);
   ctx.fillStyle = "#ef4444";
   ctx.fill();
   ctx.lineWidth = 2;
@@ -370,4 +436,5 @@ function demCiz() {
 if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
 else { demCiz(); }
 </script>
+
 
