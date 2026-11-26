@@ -323,8 +323,8 @@ function kmlYukle(el) {
         pairs.forEach(function(pair) {
           var parts = pair.split(",");
           if (parts.length >= 2) {
-            var pLon = parseFloat(parts.at(0));
-            var pLat = parseFloat(parts.at(1));
+            var pLon = parseFloat(parts.shift());
+            var pLat = parseFloat(parts.shift());
             if (!isNaN(pLat) && !isNaN(pLon)) {
               pts.push({ lat: pLat, lon: pLon });
             }
@@ -337,7 +337,7 @@ function kmlYukle(el) {
 
       if (kmlPolygons.length > 0) {
         var st = document.getElementById("hgtSt");
-        st.innerText = "✓ KML Parsel Yüklendi (" + kmlPolygons.length + " poligon)";
+        st.innerText = "✓ KML Parsel Yüklendi (" + kmlPolygons.length + " alan)";
         st.style.color = "#fbbf24";
         demCiz(true);
       } else {
@@ -491,7 +491,7 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
   var cy = h / 2;
   var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
 
-  // KML Parsel Sınırını Çiz (Sarı Dolgu + Parlak Turuncu/Sarı Çerçeve)
+  // KML Parsel Sınırını Çiz
   if (kmlPolygons.length > 0) {
     kmlPolygons.forEach(function(pts) {
       ctx.beginPath();
@@ -517,7 +517,7 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
   mesafeler.forEach(function(m) {
     var rad = Math.round(m / mPerPx);
     if (rad > 10 && rad < w) {
-ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
+      ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
 ctx.lineWidth = (m === 50) ? 1.5 : 1;
 ctx.beginPath();
 ctx.arc(cx, cy, rad, 0, Math.PI * 2);
