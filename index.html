@@ -61,21 +61,25 @@ Hassasiyet: <b id="accV" style="color:#34d399">-</b><br>
 var lat = "", lon = "", acc = "", fotoData = "";
 var KEY = "sondaj_db_final";
 
+var watchId = null;
 function konumAl() {
-  document.getElementById("stV").innerText = "Konum sorgulanıyor...";
-  navigator.geolocation.getCurrentPosition(function(p) {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  document.getElementById("stV").innerText = "Uydulara bağlanılıyor...";
+  watchId = navigator.geolocation.watchPosition(function(p) {
     lat = p.coords.latitude.toFixed(6);
     lon = p.coords.longitude.toFixed(6);
-    acc = Math.round(p.coords.accuracy) + " m";
+    var m = Math.round(p.coords.accuracy);
+    acc = m + " m";
     document.getElementById("latV").innerText = lat;
     document.getElementById("lonV").innerText = lon;
     document.getElementById("accV").innerText = acc;
-    document.getElementById("stV").innerText = "Konum hazır";
+    document.getElementById("stV").innerText = m <= 10 ? "● GPS Kilitlendi (Yüksek Hassasiyet)" : "● Canlı takip (Hassasiyet iyileştiriliyor...)";
   }, function(e) {
     document.getElementById("stV").innerText = "Hata: " + e.message;
-  }, { enableHighAccuracy: true, timeout: 15000 });
+  }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
 }
 konumAl();
+
 
 function fotoIsle(el) {
   if (!el.files || !el.files.length) return;
