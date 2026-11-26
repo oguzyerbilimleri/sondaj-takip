@@ -222,7 +222,7 @@ function csvIndir() {
 ciz();
 </script>
 
-<!-- 2. BAĞIMSIZ BLOK: .HGT OTOMATİK KOT VE 3B İZOHİPS HARİTASI -->
+<!-- 2. BAĞIMSIZ BLOK: GERÇEKÇİ UYDU DOKULU .HGT ARAZİ + TKGM PARSEL SORGU -->
 <script>
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 
@@ -245,7 +245,7 @@ function hgtGuncelle(la, lo) {
   }
 
   loadedTileName = fileName;
-  st.innerText = "DEM Aranıyor: " + fileName + "...";
+  st.innerText = "DEM Yükleniyor: " + fileName + "...";
 
   fetch(fileName).then(function(res) {
     if (!res.ok) throw new Error("yok");
@@ -255,7 +255,7 @@ function hgtGuncelle(la, lo) {
     hgtBaseLon = bLon;
     hgtSize = Math.round(Math.sqrt(buf.byteLength / 2));
     hgtView = new DataView(buf);
-    st.innerText = "✓ Aktif DEM: " + fileName + " (3B Kabartma & İzohips)";
+    st.innerText = "✓ Aktif Uydu-DEM: " + fileName;
     st.style.color = "#34d399";
     var z2 = hgtKotOku(la, lo);
     if (z2 !== null) {
@@ -282,7 +282,6 @@ function hgtHamOku(r, c) {
   return val < -1000 ? null : val;
 }
 
-// Bilineer Enterpolasyon ile pürüzsüz kot okuma
 function hgtKotOku(la, lo) {
   if (!hgtView || !hgtSize) return null;
   var dLat = la - hgtBaseLat;
@@ -307,20 +306,46 @@ function hgtKotOku(la, lo) {
   return topZ * (1 - dr) + botZ * dr;
 }
 
+function tkgmAc() {
+  if (lat && lon) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(lat + ", " + lon);
+    }
+    alert("Koordinat kopyalandı: " + lat + ", " + lon + "\nTKGM Parsel Sorgu açılıyor, arama kutusuna yapıştırabilirsiniz.");
+  }
+  var u = new URL(window.location.href);
+  u.protocol = "https:";
+  u.hostname = "parselsorgu.tkgm.gov.tr";
+  u.pathname = "/";
+  u.search = "";
+  window.open(u.toString(), "_blank");
+}
+
 function demCiz() {
+  var bar = document.getElementById("hgtSt").parentElement;
+  if (!document.getElementById("tkgmBtn")) {
+    var btn = document.createElement("button");
+    btn.id = "tkgmBtn";
+    btn.type = "button";
+    btn.innerText = "TKGM Parsel ↗";
+    btn.style.cssText = "background:#0284c7;color:#fff;border:none;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;";
+    btn.onclick = tkgmAc;
+    bar.appendChild(btn);
+  }
+
   var c = document.getElementById("demCanvas");
   var w = c.parentElement.clientWidth - 24;
   if (w < 200) w = 320;
-  var h = 210;
+  var h = 215;
   c.width = w;
   c.height = h;
   var ctx = c.getContext("2d");
-  ctx.fillStyle = "#0b1120";
+  ctx.fillStyle = "#1c1917";
   ctx.fillRect(0, 0, w, h);
 
   if (hgtView && lat && lon) {
     var cLat = parseFloat(lat), cLon = parseFloat(lon);
-    var span = 0.025; // Yaklaşık 2.5 km görüş alanı
+    var span = 0.024;
     var step = 2;
     var cols = Math.ceil(w / step) + 1;
     var rows = Math.ceil(h / step) + 1;
@@ -352,46 +377,64 @@ function demCiz() {
         var zd = nextRow.at(col2);
         if (zc === null) continue;
 
-        // 3B Güneş Gölgelendirme (Hillshade - Kuzeybatı ışığı)
+        // Yüksek kontrastlı 3B güneş kabartması (Kuzeybatı ışığı)
         var dzdx = (zr !== null ? zr - zc : 0);
         var dzdy = (zd !== null ? zd - zc : 0);
-        var shade = 1.0 + (-dzdx - dzdy) * 0.18;
-        if (shade < 0.55) shade = 0.55;
-        if (shade > 1.45) shade = 1.45;
+        var slope = Math.sqrt(dzdx * dzdx + dzdy * dzdy);
+        var shade = 1.0 + (-dzdx * 0.85 - dzdy * 0.85) * 0.28;
+        if (shade < 0.42) shade = 0.42;
+        if (shade > 1.52) shade = 1.52;
 
+        // Doğal uydu arazi dokusu (Mikro tarla/toprak varyasyonu)
+        var tex = (Math.sin(col2 * 0.45 + r2 * 0.25) * Math.cos(r2 * 0.4 - col2 * 0.2)) * 7;
         var ratio = (zc - minZ) / diff;
-        var red = Math.min(255, Math.round((45 + ratio * 175) * shade));
-        var grn = Math.min(255, Math.round((105 + (1 - Math.abs(ratio - 0.45)) * 95) * shade));
-        var blu = Math.min(255, Math.round((65 + (1 - ratio) * 75) * shade));
+
+        // Doğal Ortofoto Paleti: Vadi Yeşili -> Kum/Tarla Beji -> Bozkır Kahvesi -> Kaya Grisi
+        var baseR, baseG, baseB;
+        if (ratio < 0.25) {
+          var t1 = ratio / 0.25;
+          baseR = 78 + t1 * 62;
+          baseG = 98 + t1 * 34;
+          baseB = 64 + t1 * 24;
+        } else if (ratio < 0.6) {
+          var t2 = (ratio - 0.25) / 0.35;
+          baseR = 140 + t2 * 38;
+          baseG = 132 + t2 * 22;
+          baseB = 88 + t2 * 22;
+        } else {
+          var t3 = (ratio - 0.6) / 0.4;
+          baseR = 178 - t3 * 22;
+          baseG = 154 - t3 * 16;
+          baseB = 110 + t3 * 25;
+        }
+
+        // Dik yamaçlarda doğal kaya dokusu belirginleşir
+        if (slope > 0.8) {
+          baseR = baseR * 0.88 + 18;
+          baseG = baseG * 0.86 + 15;
+          baseB = baseB * 0.85 + 14;
+        }
+
+        var red = Math.max(15, Math.min(250, Math.round((baseR + tex) * shade)));
+        var grn = Math.max(15, Math.min(245, Math.round((baseG + tex * 0.9) * shade)));
+        var blu = Math.max(15, Math.min(235, Math.round((baseB + tex * 0.7) * shade)));
 
         ctx.fillStyle = "rgb(" + red + "," + grn + "," + blu + ")";
         ctx.fillRect(col2 * step, r2 * step, step, step);
-
-        // 5 Metrelik İzohips (Eşyükselti) Eğrisi Çizimi
-        if (zr !== null && zd !== null) {
-          var isoStep = 5;
-          var b0 = Math.floor(zc / isoStep);
-          var br = Math.floor(zr / isoStep);
-          var bd = Math.floor(zd / isoStep);
-          if (b0 !== br || b0 !== bd) {
-            ctx.fillStyle = (b0 % 4 === 0) ? "rgba(255, 255, 255, 0.55)" : "rgba(15, 23, 42, 0.45)";
-            ctx.fillRect(col2 * step, r2 * step, step, step);
-          }
-        }
       }
     }
 
-    // Kot Bilgisi ve Ölçek Çubuğu
-    ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
-    ctx.fillRect(8, 8, 195, 22);
+    // Kot Aralığı ve Ölçek Bilgisi
+    ctx.fillStyle = "rgba(15, 23, 42, 0.76)";
+    ctx.fillRect(8, 8, 155, 22);
     ctx.fillStyle = "#fbbf24";
     ctx.font = "bold 11px monospace";
-    ctx.fillText("Kot: " + Math.round(minZ) + "m - " + Math.round(maxZ) + "m (İzohips: 5m)", 14, 22);
+    ctx.fillText("Kot: " + Math.round(minZ) + "m - " + Math.round(maxZ) + "m", 14, 22);
 
-    ctx.fillRect(w - 86, h - 24, 78, 18);
-    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(w - 84, h - 24, 76, 18);
+    ctx.fillStyle = "#f1f5f9";
     ctx.font = "bold 10px sans-serif";
-    ctx.fillText("◄ 500 m ►", w - 74, h - 11);
+    ctx.fillText("◄ 500 m ►", w - 72, h - 11);
   } else {
     ctx.strokeStyle = "#334155";
     ctx.beginPath();
@@ -400,11 +443,11 @@ function demCiz() {
     ctx.stroke();
   }
 
-  // Kayıtlı Sondaj Kuyuları (Mavi Noktalar)
+  // Kayıtlı Sondaj Noktaları (Mavi Pin)
   var arr = okuListe();
   if (lat && lon && arr.length) {
     var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
-    var span2 = 0.025;
+    var span2 = 0.024;
     arr.forEach(function(item) {
       var sx = ((parseFloat(item.lon) - cLon2) / span2 + 0.5) * w;
       var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * h;
@@ -423,12 +466,12 @@ function demCiz() {
     });
   }
 
-  // Mevcut Konum (Kırmızı Nokta)
+  // Mevcut Konum (Kırmızı Pin)
   ctx.beginPath();
   ctx.arc(w / 2, h / 2, 6, 0, Math.PI * 2);
   ctx.fillStyle = "#ef4444";
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.strokeStyle = "#ffffff";
   ctx.stroke();
 }
@@ -436,5 +479,6 @@ function demCiz() {
 if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
 else { demCiz(); }
 </script>
+
 
 
