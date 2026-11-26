@@ -155,10 +155,10 @@
         konumAl();
     </script>
 
-    <!-- 2. BLOK: FOTOĞRAF FİLİGRANI VE KAYDETME -->
+    <!-- 2. BLOK: FOTOĞRAF VE KAYIT -->
     <script>
         var processedPhotoDataUrl = null;
-        var STORAGE_KEY = "zemin_etut_kayitlar_v2";
+        var STORAGE_KEY = "zemin_etut_kayitlar_v3";
 
         function kayitlariGetir() {
             try {
@@ -174,7 +174,7 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(liste));
                 return true;
             } catch (e) {
-                alert("Telefon tarayıcı hafızası doldu! Eski kayıtları indirip silin.");
+                alert("Hafıza dolu! Eski kayıtları indirip silin.");
                 return false;
             }
         }
@@ -303,18 +303,24 @@ listEl.appendChild(card);
 }
 function kayitSil(id) {
 if (!confirm("Bu kaydı silmek istediğinize emin misiniz?")) return;
-var liste = kayitlariGetir().filter(function(r) { return r.id !== id; });
-kayitlariSakla(liste);
+var yeniListe = new Array();
+var liste = kayitlariGetir();
+liste.forEach(function(r) {
+if (r.id !== id) yeniListe.push(r);
+});
+kayitlariSakla(yeniListe);
 listeyiCiz();
 }
 function fotoIndirId(id) {
 var liste = kayitlariGetir();
-var r = liste.find(function(item) { return item.id === id; });
-if (!r || !r.photo) return;
+liste.forEach(function(r) {
+if (r.id === id && r.photo) {
 var a = document.createElement('a');
 a.href = r.photo;
 a.download = (r.parcel + "" + r.skNo + ".jpg").replace(/\s+/g, '');
 a.click();
+}
+});
 }
 document.getElementById('csvBtn').addEventListener('click', function() {
 var liste = kayitlariGetir();
