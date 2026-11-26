@@ -28,7 +28,6 @@ button{border:none;border-radius:8px;font-weight:700;cursor:pointer}
 <button type="button" class="btn-csv" onclick="csvIndir()">Excel (CSV)</button>
 </header>
 
-<!-- OTOMATİK .HGT TOPOĞRAFYA VE KOT KARTI -->
 <div class="card">
 <div class="hgt-bar">
 <span id="hgtSt" style="font-size:11px;color:#38bdf8">DEM Kot Verisi: Konum bekleniyor...</span>
@@ -36,7 +35,6 @@ button{border:none;border-radius:8px;font-weight:700;cursor:pointer}
 <canvas id="demCanvas"></canvas>
 </div>
 
-<!-- GPS KARTI -->
 <div class="card" style="display:flex;justify-content:space-between;align-items:center">
 <div style="font-size:13px;line-height:1.6">
 Enlem: <b id="latV" style="color:#fbbf24">-</b><br>
@@ -48,7 +46,6 @@ Hassasiyet: <b id="accV" style="color:#34d399">-</b><br>
 <button type="button" class="btn-gps" onclick="konumAl()">Konum Al</button>
 </div>
 
-<!-- SONDAJ FORMU -->
 <div class="card">
 <div class="row">
 <div><label>Ada / Parsel *</label><input id="pIn" placeholder="104 / 12"></div>
@@ -76,6 +73,11 @@ var KEY = "sondaj_db_final";
 var watchId = null;
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 
+function okuListe() {
+  var raw = localStorage.getItem(KEY);
+  return raw ? JSON.parse(raw) : new Array();
+}
+
 function otomatikHgtGetir(la, lo) {
   var bLat = Math.floor(la);
   var bLon = Math.floor(lo);
@@ -94,7 +96,7 @@ function otomatikHgtGetir(la, lo) {
 
   fetch(fileName)
     .then(function(res) {
-      if (!res.ok) throw new Error("Dosya bulunamadı");
+      if (!res.ok) throw new Error("Dosya yok");
       return res.arrayBuffer();
     })
     .then(function(buf) {
@@ -110,7 +112,7 @@ function otomatikHgtGetir(la, lo) {
     })
     .catch(function() {
       loadedTileName = "";
-      document.getElementById("hgtSt").innerText = "Not: Depoda " + fileName + " bulunamadı (GPS kotu kullanılıyor)";
+      document.getElementById("hgtSt").innerText = "Depoda " + fileName + " yok (GPS kotu aktif)";
       document.getElementById("hgtSt").style.color = "#94a3b8";
     });
 }
@@ -190,7 +192,7 @@ function demCiz() {
     ctx.stroke();
   }
 
-  var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+  var arr = okuListe();
   if (lat && lon && arr.length) {
     var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
     var span2 = 0.015;
@@ -259,7 +261,7 @@ function fotoIsle(el) {
       ctx.fillRect(0, h - 54, w, 54);
       ctx.fillStyle = "#fbbf24";
       ctx.font = "bold 13px sans-serif";
-var p = document.getElementById("pIn").value || "-";
+      var p = document.getElementById("pIn").value || "-";
 var s = document.getElementById("sIn").value || "-";
 ctx.fillText("Parsel: " + p + " | " + s + " | Kot: " + kot + " | " + new Date().toLocaleString("tr-TR"), 10, h - 32);
 ctx.fillStyle = "#ffffff";
@@ -278,7 +280,7 @@ var p = document.getElementById("pIn").value.trim();
 var s = document.getElementById("sIn").value.trim();
 if (!p || !s) { alert("Ada/Parsel ve Sondaj No girin."); return; }
 if (!lat) { alert("Önce Konum Al butonuna basın."); return; }
-var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+var arr = okuListe();
 arr.unshift({
 id: Date.now(), p: p, s: s,
 d: document.getElementById("dIn").value,
@@ -302,7 +304,7 @@ demCiz();
 alert("Kaydedildi!");
 }
 function ciz() {
-var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+var arr = okuListe();
 document.getElementById("cnt").innerText = arr.length;
 var box = document.getElementById("list");
 box.innerHTML = "";
@@ -321,13 +323,13 @@ box.appendChild(div);
 }
 function sil(id) {
 if (!confirm("Silinsin mi?")) return;
-var arr = JSON.parse(localStorage.getItem(KEY) || "[]").filter(function(x) { return x.id !== id; });
+var arr = okuListe().filter(function(x) { return x.id !== id; });
 localStorage.setItem(KEY, JSON.stringify(arr));
 ciz();
 demCiz();
 }
 function indir(id) {
-var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+var arr = okuListe();
 arr.forEach(function(x) {
 if (x.id === id && x.f) {
 var a = document.createElement("a");
@@ -338,7 +340,7 @@ a.click();
 });
 }
 function csvIndir() {
-var arr = JSON.parse(localStorage.getItem(KEY) || "[]");
+var arr = okuListe();
 if (!arr.length) { alert("Kayıt yok"); return; }
 var csv = "\uFEFFParsel;Sondaj;Enlem;Boylam;Kot;Hassasiyet;Derinlik;YAS;Not;Tarih\n";
 arr.forEach(function(x) {
