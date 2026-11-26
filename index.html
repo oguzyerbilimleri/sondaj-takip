@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zemin Etüt - Saha Sondaj Kayıt</title>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <script src="https://unpkg.com"></script>
-
+    <link rel="stylesheet" href="https://cloudflare.com" />
+    <script src="https://cloudflare.com"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: #0f172a; color: #f1f5f9; padding-bottom: 60px; }
@@ -16,12 +15,11 @@
         .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-        .map-wrap { position: relative; height: 250px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
-        #tileLayer { position: absolute; inset: 0; z-index: 1; }
-        .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
-        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
-        .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
-        .layer-btn { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.88); color: #f1f5f9; border: 1px solid #475569; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 7px 10px; cursor: pointer; z-index: 20; }
+        .map-wrap { position: relative; height: 260px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
+        #map { width: 100%; height: 100%; z-index: 1; }
+        .key-bar { display: flex; gap: 6px; margin-bottom: 10px; }
+        .key-bar input { flex: 1; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+        .key-bar button { background: #334155; color: #fbbf24; border: 1px solid #475569; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
         .gps-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 13px; line-height: 1.7; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
@@ -32,11 +30,11 @@
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .field { margin-bottom: 10px; }
         label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
-        input { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
-        #previewImg { display: none; width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #475569; }
+        input[type="text"], input[type="number"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
+        #previewImg { display: none; width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #fbbf24; }
         .btn-save { width: 100%; background: #059669; color: #fff; border: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
         .rec-item { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; display: flex; gap: 10px; margin-bottom: 10px; }
-        .rec-img { width: 75px; height: 75px; object-fit: cover; border-radius: 8px; border: 1px solid #475569; flex-shrink: 0; }
+        .rec-img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #475569; flex-shrink: 0; cursor: pointer; }
         .rec-body { flex: 1; font-size: 12px; line-height: 1.5; }
         .rec-top { display: flex; justify-content: space-between; font-weight: 700; color: #fbbf24; }
         .btn-del { background: none; border: none; color: #f87171; font-weight: 700; font-size: 12px; cursor: pointer; }
@@ -54,14 +52,12 @@
 
     <main>
         <div class="card">
+            <div class="key-bar">
+                <input type="text" id="mtKeyInput" placeholder="MapTiler API Anahtarını buraya yapıştır...">
+                <button type="button" id="saveKeyBtn">Uyduyu Aç</button>
+            </div>
             <div class="map-wrap">
-                <div id="tileLayer"></div>
-                <div class="pin-center"></div>
-                <button type="button" class="layer-btn" id="layerBtn">Uydu / Harita</button>
-                <div class="zoom-btns">
-                    <button type="button" class="z-btn" id="zoomIn">+</button>
-                    <button type="button" class="z-btn" id="zoomOut">−</button>
-                </div>
+                <div id="map"></div>
             </div>
             <div class="gps-box">
                 <div class="gps-info">
@@ -116,11 +112,46 @@
 
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
-    <!-- 1. BLOK: SADECE GPS (HARİTADAN BAĞIMSIZ) -->
+    <!-- 1. BLOK: GPS VE HARİTA -->
     <script>
         var currentLat = null;
         var currentLon = null;
         var currentAcc = null;
+        var map = null;
+        var userMarker = null;
+        var satLayer = null;
+
+        function initMap() {
+            if (typeof L === 'undefined') return;
+            map = L.map('map').setView([38.3687, 34.0370], 13);
+            var savedKey = localStorage.getItem('maptiler_key') || '';
+            document.getElementById('mtKeyInput').value = savedKey;
+            applyMapTilerLayer(savedKey);
+            setTimeout(function() { map.invalidateSize(); }, 400);
+        }
+
+        function applyMapTilerLayer(key) {
+            if (!map) return;
+            if (satLayer) {
+                map.removeLayer(satLayer);
+            }
+            if (key && key.trim().length > 5) {
+                var proto = window.location.protocol + "//";
+                var url = proto + "://maptiler.com{z}/{x}/{y}.jpg?key=" + key.trim();
+                satLayer = L.tileLayer(url, { maxZoom: 20, attribution: 'MapTiler' }).addTo(map);
+            }
+        }
+
+        document.getElementById('saveKeyBtn').addEventListener('click', function() {
+            var k = document.getElementById('mtKeyInput').value.trim();
+            if (!k) {
+                alert("Lütfen MapTiler API anahtarınızı yapıştırın.");
+                return;
+            }
+            localStorage.setItem('maptiler_key', k);
+            applyMapTilerLayer(k);
+            alert("MapTiler Uydu Katmanı kaydedildi ve aktif edildi!");
+        });
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -135,8 +166,14 @@
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
 
-            if (typeof uyduCiz === "function") {
-                uyduCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom);
+            if (map) {
+                var ll = [parseFloat(currentLat), parseFloat(currentLon)];
+                map.setView(ll, 18);
+                if (userMarker) {
+                    userMarker.setLatLng(ll);
+                } else {
+                    userMarker = L.circleMarker(ll, { radius: 8, color: '#ffffff', fillColor: '#ef4444', fillOpacity: 1, weight: 2 }).addTo(map);
+                }
             }
         }
 
@@ -148,69 +185,31 @@
                 return;
             }
             statusEl.innerText = "Konum sorgulanıyor...";
-            statusEl.style.color = "#fbbf24";
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function() {},
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-            );
-
-            navigator.geolocation.getCurrentPosition(
-                ekranaKonumYaz,
-                function(err) {
-                    if (!currentLat) {
-                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-                        statusEl.style.color = "#f87171";
-                    }
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
-        }
-
-        document.getElementById('gpsBtn').addEventListener('click', konumAl);
-        konumAl();
-    </script>
-
-           <!-- 2. BLOK: UYDU VE HARİTA -->
-    <script>
-        var mapZoom = 17;
-        var isSat = true;
-        var lMap = null;
-        var satLayer = null;
-        var osmLayer = null;
-
-        if (typeof L !== 'undefined') {
-            lMap = L.map('tileLayer', { zoomControl: false }).setView([38.3687, 34.0370], 13);
-            satLayer = L.tileLayer('https://arcgisonline.com{z}/{y}/{x}', { maxZoom: 19 }).addTo(lMap);
-            osmLayer = L.tileLayer('https://openstreetmap.org{z}/{x}/{y}.png', { maxZoom: 19 });
-            setTimeout(function() { lMap.invalidateSize(); }, 400);
-        }
-
-        function uyduCiz(lat, lon, zoom) {
-            if (lMap) {
-                lMap.invalidateSize();
-                lMap.setView([lat, lon], zoom);
-            }
-        }
-
-        document.getElementById('zoomIn').addEventListener('click', function() { if (lMap) lMap.zoomIn(); });
-        document.getElementById('zoomOut').addEventListener('click', function() { if (lMap) lMap.zoomOut(); });
-        document.getElementById('layerBtn').addEventListener('click', function() {
-            if (!lMap) return;
-            isSat = !isSat;
-            if (isSat) { lMap.removeLayer(osmLayer); satLayer.addTo(lMap); }
-            else { lMap.removeLayer(satLayer); osmLayer.addTo(lMap); }
-        });
-
-
-        uyduCiz(38.3687, 34.0370, 12);
-
+statusEl.style.color = "#fbbf24";
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function() {},
+{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+);
+navigator.geolocation.getCurrentPosition(
+ekranaKonumYaz,
+function(err) {
+if (!currentLat) {
+statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+statusEl.style.color = "#f87171";
+}
+},
+{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+);
+}
+initMap();
+document.getElementById('gpsBtn').addEventListener('click', konumAl);
+konumAl();
 var db = null;
 var processedPhotoDataUrl = null;
-var allRecordsCache = new Array();
+var allRecordsCache = [];
 document.getElementById('photoInput').addEventListener('change', function(e) {
-var file = e.target.files.item(0);
+var file = e.target.files[0];
 if (!file) return;
 var reader = new FileReader();
 reader.onload = function(event) {
@@ -228,19 +227,19 @@ else { w = Math.round(w * maxDim / h); h = maxDim; }
 canvas.width = w;
 canvas.height = h;
 ctx.drawImage(img, 0, 0, w, h);
-var barH = Math.max(60, h * 0.08);
-ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+var barH = Math.max(64, Math.round(h * 0.09));
+ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
 ctx.fillRect(0, h - barH, w, barH);
 ctx.fillStyle = "#fbbf24";
-var fSize = Math.max(16, Math.round(w * 0.025));
+var fSize = Math.max(16, Math.round(w * 0.026));
 ctx.font = "bold " + fSize + "px sans-serif";
 var sk = document.getElementById('skNo').value || "Sondaj";
 var parcel = document.getElementById('parcel').value || "-";
 var dateStr = new Date().toLocaleString('tr-TR');
 var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
-ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 5);
+ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 15, h - barH + fSize + 6);
 ctx.fillStyle = "#ffffff";
-ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 12);
+ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 15, h - 14);
 processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
 var preview = document.getElementById('previewImg');
 preview.src = processedPhotoDataUrl;
@@ -265,6 +264,10 @@ if (!currentLat) {
 alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
 return;
 }
+if (!db) {
+alert("Veritabanı hazır değil, sayfayı yenileyip tekrar deneyin.");
+return;
+}
 var record = {
 parcel: document.getElementById('parcel').value,
 skNo: document.getElementById('skNo').value,
@@ -284,7 +287,7 @@ document.getElementById('boreholeForm').reset();
 document.getElementById('previewImg').style.display = "none";
 processedPhotoDataUrl = null;
 renderRecords();
-alert("Sondaj kaydedildi!");
+alert("Sondaj başarıyla kaydedildi!");
 };
 });
 function renderRecords() {
@@ -320,7 +323,7 @@ tx.objectStore("sondajlar").delete(id);
 tx.oncomplete = renderRecords;
 }
 function downloadByIdx(idx) {
-var r = allRecordsCache.at(idx);
+var r = allRecordsCache[idx];
 if (!r || !r.photo) return;
 var a = document.createElement('a');
 a.href = r.photo;
