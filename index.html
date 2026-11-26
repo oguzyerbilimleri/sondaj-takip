@@ -13,13 +13,6 @@
         .btn-csv { background: #0f172a; color: #fbbf24; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-        .map-wrap { position: relative; height: 260px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
-        #tileLayer { position: absolute; inset: 0; overflow: hidden; }
-        #localBg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; z-index: 2; }
-        .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
-        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
-        .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
-        .bg-upload-btn { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.88); color: #38bdf8; border: 1px solid #475569; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 7px 9px; cursor: pointer; z-index: 20; }
         .gps-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 13px; line-height: 1.7; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
@@ -31,10 +24,11 @@
         .field { margin-bottom: 10px; }
         label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
         input { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
-        #previewImg { display: none; width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #fbbf24; }
-        .btn-save { width: 100%; background: #059669; color: #fff; border: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+        #photoStatus { font-size: 11px; color: #34d399; margin-top: 6px; font-weight: 600; display: none; }
+        #previewImg { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 2px solid #fbbf24; }
+        .btn-save { width: 100%; background: #059669; color: #fff; border: none; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 6px; }
         .rec-item { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; display: flex; gap: 10px; margin-bottom: 10px; }
-        .rec-img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #475569; flex-shrink: 0; cursor: pointer; }
+        .rec-img { width: 85px; height: 85px; object-fit: cover; border-radius: 8px; border: 1px solid #fbbf24; flex-shrink: 0; cursor: pointer; }
         .rec-body { flex: 1; font-size: 12px; line-height: 1.5; }
         .rec-top { display: flex; justify-content: space-between; font-weight: 700; color: #fbbf24; }
         .btn-del { background: none; border: none; color: #f87171; font-weight: 700; font-size: 12px; cursor: pointer; }
@@ -51,20 +45,8 @@
     </header>
 
     <main>
+        <!-- GPS KARTI -->
         <div class="card">
-            <div class="map-wrap">
-                <div id="tileLayer"></div>
-                <img id="localBg" />
-                <div class="pin-center"></div>
-                <label class="bg-upload-btn">
-                    Altlık Görüntü Yükle
-                    <input type="file" id="bgFileInput" accept="image/*" style="display:none;">
-                </label>
-                <div class="zoom-btns">
-                    <button type="button" class="z-btn" id="zoomIn">+</button>
-                    <button type="button" class="z-btn" id="zoomOut">−</button>
-                </div>
-            </div>
             <div class="gps-box">
                 <div class="gps-info">
                     <div>Enlem (Lat): <span id="latVal" class="gps-val">-</span></div>
@@ -76,16 +58,17 @@
             </div>
         </div>
 
-        <form id="boreholeForm" class="card">
+        <!-- SONDAJ FORMU -->
+        <div class="card">
             <h2>Yeni Sondaj Noktası Ekle</h2>
             <div class="row">
                 <div>
-                    <label>Ada / Parsel</label>
-                    <input type="text" id="parcel" required placeholder="Örn: 104 / 12">
+                    <label>Ada / Parsel *</label>
+                    <input type="text" id="parcel" placeholder="Örn: 104 / 12">
                 </div>
                 <div>
-                    <label>Sondaj No</label>
-                    <input type="text" id="skNo" required placeholder="Örn: SK-1">
+                    <label>Sondaj No *</label>
+                    <input type="text" id="skNo" placeholder="Örn: SK-1">
                 </div>
             </div>
             <div class="row">
@@ -103,13 +86,15 @@
                 <input type="text" id="notes" placeholder="Zemin cinsi, karot durumu vb.">
             </div>
             <div class="field">
-                <label>Sondaj Fotoğrafı (Otomatik Koordinat Basılır)</label>
+                <label>Sondaj Fotoğrafı (Önce üstteki bilgileri doldurun)</label>
                 <input type="file" id="photoInput" accept="image/*" capture="environment">
+                <div id="photoStatus"></div>
                 <img id="previewImg" />
             </div>
-            <button type="submit" class="btn-save">Sondajı Kaydet</button>
-        </form>
+            <button type="button" class="btn-save" id="saveBtn">Sondajı Kaydet</button>
+        </div>
 
+        <!-- KAYITLI LİSTE -->
         <div>
             <h2>Kayıtlı Sondajlar (<span id="count">0</span>)</h2>
             <div id="recordsList"></div>
@@ -136,10 +121,6 @@
             var statusEl = document.getElementById('gpsStatus');
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
-
-            if (typeof mapTilerCiz === "function") {
-                mapTilerCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom);
-            }
         }
 
         function konumAl() {
@@ -174,139 +155,106 @@
         konumAl();
     </script>
 
-    <!-- 2. BLOK: MAPTILER UYDU VE YEREL ALTLIK -->
+    <!-- 2. BLOK: FOTOĞRAF FİLİGRANI VE KAYDETME -->
     <script>
-        var mapZoom = 17;
-        var mtKey = "LLZMhjAwzMdIqcazuDtw";
+        var processedPhotoDataUrl = null;
+        var STORAGE_KEY = "zemin_etut_kayitlar_v2";
 
-        function mapTilerCiz(lat, lon, zoom) {
+        function kayitlariGetir() {
             try {
-                var box = document.getElementById('tileLayer');
-var w = box.clientWidth || 360;
-var h = box.clientHeight || 260;
-box.innerHTML = "";
-var n = Math.pow(2, zoom);
-var latRad = lat * Math.PI / 180;
-var xFloat = (lon + 180) / 360 * n;
-var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-var tileX = Math.floor(xFloat);
-var tileY = Math.floor(yFloat);
-var offX = (xFloat - tileX) * 256;
-var offY = (yFloat - tileY) * 256;
-var cx = w / 2;
-var cy = h / 2;
-var host = "https:" + "//" + "api.maptiler." + "com/tiles/satellite-v2/";
-for (var dx = -1; dx <= 1; dx++) {
-for (var dy = -1; dy <= 1; dy++) {
-var img = document.createElement('img');
-var tx = tileX + dx;
-var ty = tileY + dy;
-img.src = host + zoom + "/" + tx + "/" + ty + ".jpg?key=" + mtKey;
-img.style.position = "absolute";
-img.style.width = "256px";
-img.style.height = "256px";
-img.style.left = Math.round(cx - offX + dx * 256) + "px";
-img.style.top = Math.round(cy - offY + dy * 256) + "px";
-box.appendChild(img);
-}
-}
-} catch (e) {}
-}
-document.getElementById('bgFileInput').addEventListener('change', function(e) {
-var f = e.target.files.item(0);
-if (!f) return;
-var r = new FileReader();
-r.onload = function(ev) {
-var bg = document.getElementById('localBg');
-bg.src = ev.target.result;
-bg.style.display = "block";
-};
-r.readAsDataURL(f);
-});
-document.getElementById('zoomIn').addEventListener('click', function() {
-if (mapZoom < 20) {
-mapZoom++;
-mapTilerCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
-}
-});
-document.getElementById('zoomOut').addEventListener('click', function() {
-if (mapZoom > 10) {
-mapZoom--;
-mapTilerCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
-}
-});
-mapTilerCiz(38.3687, 34.0370, 13);
-var processedPhotoDataUrl = null;
-var STORAGE_KEY = "zemin_etut_sondajlar_v1";
-function getRecords() {
-try {
-var raw = localStorage.getItem(STORAGE_KEY);
-return raw ? JSON.parse(raw) : new Array();
-} catch (e) {
-return new Array();
-}
-}
-function saveRecords(arr) {
-try {
-localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-return true;
-} catch (e) {
-alert("Hafıza dolu! Lütfen eski kayıtları Excel olarak indirip silin.");
-return false;
-}
-}
-document.getElementById('photoInput').addEventListener('change', function(e) {
-var file = e.target.files.item(0);
-if (!file) return;
-var reader = new FileReader();
-reader.onload = function(event) {
-var img = new Image();
-img.onload = function() {
-var canvas = document.getElementById('watermarkCanvas');
-var ctx = canvas.getContext('2d');
-var maxDim = 900;
-var w = img.width;
-var h = img.height;
-if (w > maxDim || h > maxDim) {
-if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-else { w = Math.round(w * maxDim / h); h = maxDim; }
-}
+                var veri = localStorage.getItem(STORAGE_KEY);
+                return veri ? JSON.parse(veri) : new Array();
+            } catch (e) {
+                return new Array();
+            }
+        }
+
+        function kayitlariSakla(liste) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(liste));
+                return true;
+            } catch (e) {
+                alert("Telefon tarayıcı hafızası doldu! Eski kayıtları indirip silin.");
+                return false;
+            }
+        }
+
+        document.getElementById('photoInput').addEventListener('change', function() {
+            var inputEl = document.getElementById('photoInput');
+            var pStatus = document.getElementById('photoStatus');
+            if (!inputEl.files || inputEl.files.length === 0) return;
+
+            var file = inputEl.files.item(0);
+            pStatus.style.display = "block";
+            pStatus.style.color = "#fbbf24";
+            pStatus.innerText = "Fotoğraf işleniyor ve koordinat yazılıyor...";
+
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.getElementById('watermarkCanvas');
+                    var ctx = canvas.getContext('2d');
+                    var maxDim = 800;
+                    var w = img.width;
+                    var h = img.height;
+
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) {
+                            h = Math.round(h * maxDim / w);
+                            w = maxDim;
+                        } else {
+                            w = Math.round(w * maxDim / h);
+                            h = maxDim;
+                        }
+                    }
+
 canvas.width = w;
 canvas.height = h;
 ctx.drawImage(img, 0, 0, w, h);
-var barH = Math.max(60, Math.round(h * 0.10));
-ctx.fillStyle = "rgba(0, 0, 0, 0.80)";
+var barH = Math.max(66, Math.round(h * 0.11));
+ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
 ctx.fillRect(0, h - barH, w, barH);
-ctx.fillStyle = "#fbbf24";
-var fSize = Math.max(15, Math.round(w * 0.026));
+var fSize = Math.max(14, Math.round(w * 0.028));
 ctx.font = "bold " + fSize + "px sans-serif";
+var parcel = document.getElementById('parcel').value || "Belirtilmedi";
 var sk = document.getElementById('skNo').value || "Sondaj";
-var parcel = document.getElementById('parcel').value || "-";
+var depth = document.getElementById('depth').value;
 var dateStr = new Date().toLocaleString('tr-TR');
-var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Yok";
-ctx.fillText("Parsel: " + parcel + " | " + sk + " | " + dateStr, 12, h - barH + fSize + 5);
+var coordStr = currentLat ? (currentLat + ", " + currentLon) : "Konum Alınmadı";
+ctx.fillStyle = "#fbbf24";
+var line1 = "Parsel: " + parcel + " | " + sk + (depth ? (" (" + depth + "m)") : "") + " | " + dateStr;
+ctx.fillText(line1, 12, h - barH + fSize + 6);
 ctx.fillStyle = "#ffffff";
-ctx.fillText("Koordinat: " + coordStr + " (" + (currentAcc || "-") + ")", 12, h - 12);
-processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+var line2 = "Koordinat: " + coordStr + " (Hassasiyet: " + (currentAcc || "-") + ")";
+ctx.fillText(line2, 12, h - 12);
+processedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.68);
 var preview = document.getElementById('previewImg');
 preview.src = processedPhotoDataUrl;
 preview.style.display = "block";
+pStatus.style.color = "#34d399";
+pStatus.innerText = "✓ Koordinat ve parsel bilgisi fotoğrafa işlendi!";
 };
 img.src = event.target.result;
 };
 reader.readAsDataURL(file);
 });
-document.getElementById('boreholeForm').addEventListener('submit', function(e) {
-e.preventDefault();
-if (!currentLat) {
-alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
+document.getElementById('saveBtn').addEventListener('click', function() {
+var parcelVal = document.getElementById('parcel').value.trim();
+var skVal = document.getElementById('skNo').value.trim();
+if (!parcelVal || !skVal) {
+alert("Lütfen Ada / Parsel ve Sondaj No alanlarını doldurun.");
 return;
 }
-var records = getRecords();
-var record = {
+if (!currentLat) {
+alert("Önce üstteki 'Konum Al' butonuna basarak koordinat alın.");
+return;
+}
+var liste = kayitlariGetir();
+var yeniKayit = {
 id: Date.now(),
-parcel: document.getElementById('parcel').value,
-skNo: document.getElementById('skNo').value,
+parcel: parcelVal,
+skNo: skVal,
 depth: document.getElementById('depth').value,
 waterLevel: document.getElementById('waterLevel').value,
 notes: document.getElementById('notes').value,
@@ -316,21 +264,27 @@ acc: currentAcc,
 date: new Date().toLocaleString('tr-TR'),
 photo: processedPhotoDataUrl
 };
-records.unshift(record);
-if (saveRecords(records)) {
-document.getElementById('boreholeForm').reset();
+liste.unshift(yeniKayit);
+if (kayitlariSakla(liste)) {
+document.getElementById('parcel').value = "";
+document.getElementById('skNo').value = "";
+document.getElementById('depth').value = "";
+document.getElementById('waterLevel').value = "";
+document.getElementById('notes').value = "";
+document.getElementById('photoInput').value = "";
 document.getElementById('previewImg').style.display = "none";
+document.getElementById('photoStatus').style.display = "none";
 processedPhotoDataUrl = null;
-renderRecords();
+listeyiCiz();
 alert("Sondaj başarıyla kaydedildi!");
 }
 });
-function renderRecords() {
-var list = document.getElementById('recordsList');
-var records = getRecords();
-document.getElementById('count').innerText = records.length;
-list.innerHTML = "";
-records.forEach(function(r, idx) {
+function listeyiCiz() {
+var listEl = document.getElementById('recordsList');
+var liste = kayitlariGetir();
+document.getElementById('count').innerText = liste.length;
+listEl.innerHTML = "";
+liste.forEach(function(r, idx) {
 var card = document.createElement('div');
 card.className = "rec-item";
 var imgHtml = r.photo
@@ -343,19 +297,19 @@ card.innerHTML = imgHtml +
 '' + r.lat + ', ' + r.lon + '' +
 'Derinlik: ' + (r.depth || '-') + 'm | YAS: ' + (r.waterLevel || '-') + 'm' +
 (r.notes ? '"' + r.notes + '"' : '') +
-'' + r.date + '';
-list.appendChild(card);
+'' + r.date + ' (Fotoğrafa dokunarak indir)';
+listEl.appendChild(card);
 });
 }
-function deleteRecord(id) {
-if (!confirm("Silmek istediğinize emin misiniz?")) return;
-var records = getRecords().filter(function(r) { return r.id !== id; });
-saveRecords(records);
-renderRecords();
+function kayitSil(id) {
+if (!confirm("Bu kaydı silmek istediğinize emin misiniz?")) return;
+var liste = kayitlariGetir().filter(function(r) { return r.id !== id; });
+kayitlariSakla(liste);
+listeyiCiz();
 }
-function downloadByIdx(idx) {
-var records = getRecords();
-var r = records.at(idx);
+function fotoIndir(idx) {
+var liste = kayitlariGetir();
+var r = liste.at(idx);
 if (!r || !r.photo) return;
 var a = document.createElement('a');
 a.href = r.photo;
@@ -363,11 +317,14 @@ a.download = (r.parcel + "" + r.skNo + ".jpg").replace(/\s+/g, '');
 a.click();
 }
 document.getElementById('csvBtn').addEventListener('click', function() {
-var records = getRecords();
-if (!records.length) return alert("Kayıt yok.");
+var liste = kayitlariGetir();
+if (!liste.length) {
+alert("Dışa aktarılacak kayıt yok.");
+return;
+}
 var bom = String.fromCharCode(65279);
 var csv = bom + "Ada/Parsel;Sondaj No;Enlem;Boylam;Hassasiyet;Derinlik (m);YAS (m);Notlar;Tarih\n";
-records.forEach(function(r) {
+liste.forEach(function(r) {
 csv += '"' + r.parcel + '";"' + r.skNo + '";"' + r.lat + '";"' + r.lon + '";"' + r.acc + '";"' + r.depth + '";"' + r.waterLevel + '";"' + r.notes + '";"' + r.date + '"\n';
 });
 var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -376,4 +333,4 @@ a.href = URL.createObjectURL(blob);
 a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0,10) + ".csv";
 a.click();
 });
-renderRecords();
+listeyiCiz();
