@@ -222,13 +222,14 @@ function csvIndir() {
 ciz();
 </script>
 
-<!-- 2. BAĞIMSIZ BLOK: PIRPIRSIZ UYDU + ZOOM + .HGT KOT -->
+<!-- 2. BAĞIMSIZ BLOK: UYDU + KML PARSEL SINIRI + ZOOM + .HGT KOT -->
 <script>
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 var uyduZoom = 18;
 var uyduAktif = true;
 var tileCache = {};
 var sonCizilenLat = null, sonCizilenLon = null, sonCizilenZoom = null;
+var kmlPolygons = new Array();
 
 function hgtGuncelle(la, lo) {
   var st = document.getElementById("hgtSt");
@@ -303,18 +304,79 @@ function hgtKotOku(la, lo) {
   return (z00 * (1 - dc) + z01 * dc) * (1 - dr) + (z10 * (1 - dc) + z11 * dc) * dr;
 }
 
+function kmlYukle(el) {
+  if (!el.files || !el.files.length) return;
+  var file = el.files.item(0);
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var xmlText = ev.target.result;
+      var parser = new DOMParser();
+      var xmlDoc = parser.parseFromString(xmlText, "text/xml");
+      var coordNodes = xmlDoc.getElementsByTagName("coordinates");
+      kmlPolygons = new Array();
+
+      for (var i = 0; i < coordNodes.length; i++) {
+        var raw = coordNodes.item(i).textContent.trim();
+        var pairs = raw.split(/\s+/);
+        var pts = new Array();
+        pairs.forEach(function(pair) {
+          var parts = pair.split(",");
+          if (parts.length >= 2) {
+            var pLon = parseFloat(parts.at(0));
+            var pLat = parseFloat(parts.at(1));
+            if (!isNaN(pLat) && !isNaN(pLon)) {
+              pts.push({ lat: pLat, lon: pLon });
+            }
+          }
+        });
+        if (pts.length >= 2) {
+          kmlPolygons.push(pts);
+        }
+      }
+
+      if (kmlPolygons.length > 0) {
+        var st = document.getElementById("hgtSt");
+        st.innerText = "✓ KML Parsel Yüklendi (" + kmlPolygons.length + " poligon)";
+        st.style.color = "#fbbf24";
+        demCiz(true);
+      } else {
+        alert("KML dosyası içinde koordinat bulunamadı.");
+      }
+    } catch (e) {
+      alert("KML okuma hatası: " + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function demCiz(zorlaYenile) {
   var c = document.getElementById("demCanvas");
   var parent = c.parentElement;
 
-  // Üst bar Uydu Aç/Kapat butonu
   var bar = document.getElementById("hgtSt").parentElement;
+  if (!document.getElementById("kmlLabelBtn")) {
+    var kmlLbl = document.createElement("label");
+    kmlLbl.id = "kmlLabelBtn";
+    kmlLbl.style.cssText = "background:#d97706;color:#fff;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin:0;";
+    kmlLbl.innerText = "KML Yükle";
+
+    var kmlInp = document.createElement("input");
+    kmlInp.type = "file";
+    kmlInp.accept = ".kml,.xml";
+    kmlInp.style.display = "none";
+    kmlInp.onchange = function() { kmlYukle(this); };
+
+    kmlLbl.appendChild(kmlInp);
+    bar.appendChild(kmlLbl);
+  }
+
   if (!document.getElementById("satToggleBtn")) {
     var btn = document.createElement("button");
     btn.id = "satToggleBtn";
     btn.type = "button";
     btn.innerText = "Uydu: AÇIK";
-    btn.style.cssText = "background:#059669;color:#fff;border:none;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;";
+    btn.style.cssText = "background:#059669;color:#fff;border:none;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;";
     btn.onclick = function() {
       uyduAktif = !uyduAktif;
       btn.innerText = uyduAktif ? "Uydu: AÇIK" : "Uydu: KAPALI";
@@ -324,7 +386,6 @@ function demCiz(zorlaYenile) {
     bar.appendChild(btn);
   }
 
-  // Harita kapsayıcısı ve + / - Zoom Butonları
   if (!document.getElementById("mapZoomBox")) {
     parent.style.position = "relative";
     var zBox = document.createElement("div");
@@ -379,8 +440,7 @@ function demCiz(zorlaYenile) {
     return;
   }
 
-  // Sunucudan en fazla Zoom 17/18 çek, daha üst zoomlarda (18-20) görüntüyü dijital büyüt (Overzoom)
-  var maxNativeZoom = 16;
+  var maxNativeZoom = 17;
   var fetchZoom = uyduZoom > maxNativeZoom ? maxNativeZoom : uyduZoom;
   var scale = Math.pow(2, uyduZoom - fetchZoom);
   var tileDrawSize = 256 * scale;
@@ -429,72 +489,35 @@ function demCiz(zorlaYenile) {
 function katmanlariCiz(ctx, w, h, cLat, cLon) {
   var cx = w / 2;
   var cy = h / 2;
-
   var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
+
+  // KML Parsel Sınırını Çiz (Sarı Dolgu + Parlak Turuncu/Sarı Çerçeve)
+  if (kmlPolygons.length > 0) {
+    kmlPolygons.forEach(function(pts) {
+      ctx.beginPath();
+      pts.forEach(function(pt, idx) {
+        var dLatM = (pt.lat - cLat) * 111132;
+        var dLonM = (pt.lon - cLon) * 111320 * Math.cos(cLat * Math.PI / 180);
+        var px = cx + (dLonM / mPerPx);
+        var py = cy - (dLatM / mPerPx);
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+      ctx.fillStyle = "rgba(251, 191, 36, 0.18)";
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#fbbf24";
+      ctx.stroke();
+    });
+  }
 
   // 10m, 20m, 30m, 40m, 50m Mesafe Halkaları
   var mesafeler = new Array(10, 20, 30, 40, 50);
   mesafeler.forEach(function(m) {
     var rad = Math.round(m / mPerPx);
     if (rad > 10 && rad < w) {
-      ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
-      ctx.lineWidth = (m === 50) ? 1.5 : 1;
-      ctx.beginPath();
-      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-      ctx.stroke();
 
-      ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
-      ctx.fillRect(cx + rad - 13, cy - 13, 26, 12);
-      ctx.fillStyle = (m === 50) ? "#fbbf24" : "#f1f5f9";
-      ctx.font = "bold 9px sans-serif";
-      ctx.fillText(m + "m", cx + rad - 10, cy - 4);
-    }
-  });
-
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
-  ctx.moveTo(0, cy); ctx.lineTo(w, cy);
-  ctx.stroke();
-
-  // Kayıtlı Sondaj Kuyuları (Mavi Nokta)
-  var arr = okuListe();
-  if (lat && lon && arr.length) {
-    arr.forEach(function(item) {
-      var dLatM = (parseFloat(item.lat) - cLat) * 111132;
-      var dLonM = (parseFloat(item.lon) - cLon) * 111320 * Math.cos(cLat * Math.PI / 180);
-      var sx = cx + (dLonM / mPerPx);
-      var sy = cy - (dLatM / mPerPx);
-      if (sx >= 6 && sx <= w - 6 && sy >= 6 && sy <= h - 6) {
-        ctx.beginPath();
-        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-        ctx.fillStyle = "#38bdf8";
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "#0f172a";
-        ctx.stroke();
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 11px sans-serif";
-        ctx.fillText(item.s, sx + 7, sy + 4);
-      }
-    });
-  }
-
-  // Mevcut Konum (Kırmızı Nokta)
-  ctx.beginPath();
-  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-  ctx.fillStyle = "#ef4444";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#ffffff";
-  ctx.stroke();
-}
-
-
-if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
-else { demCiz(true); }
-</script>
 
 
 
