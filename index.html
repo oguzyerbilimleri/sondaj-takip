@@ -222,11 +222,13 @@ function csvIndir() {
 ciz();
 </script>
 
-<!-- 2. BAĞIMSIZ BLOK: UYDU GÖRÜNTÜSÜ + MESAFE HALKALARI + .HGT KOT -->
+<!-- 2. BAĞIMSIZ BLOK: PIRPIRSIZ UYDU + ZOOM + .HGT KOT -->
 <script>
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 var uyduZoom = 18;
 var uyduAktif = true;
+var tileCache = {};
+var sonCizilenLat = null, sonCizilenLon = null, sonCizilenZoom = null;
 
 function hgtGuncelle(la, lo) {
   var st = document.getElementById("hgtSt");
@@ -242,7 +244,7 @@ function hgtGuncelle(la, lo) {
       kot = Math.round(z) + " m";
       document.getElementById("altV").innerText = kot;
     }
-    demCiz();
+    demCiz(false);
     return;
   }
 
@@ -262,12 +264,12 @@ function hgtGuncelle(la, lo) {
     }
     st.innerText = "✓ Uydu + DEM (" + fileName + ") | Kot: " + kot;
     st.style.color = "#34d399";
-    demCiz();
+    demCiz(true);
   }).catch(function() {
     loadedTileName = "";
     st.innerText = "✓ Uydu + Saha Krokisi Aktif";
     st.style.color = "#34d399";
-    demCiz();
+    demCiz(false);
   });
 }
 
@@ -301,7 +303,11 @@ function hgtKotOku(la, lo) {
   return (z00 * (1 - dc) + z01 * dc) * (1 - dr) + (z10 * (1 - dc) + z11 * dc) * dr;
 }
 
-function demCiz() {
+function demCiz(zorlaYenile) {
+  var c = document.getElementById("demCanvas");
+  var parent = c.parentElement;
+
+  // Üst bar Uydu Aç/Kapat butonu
   var bar = document.getElementById("hgtSt").parentElement;
   if (!document.getElementById("satToggleBtn")) {
     var btn = document.createElement("button");
@@ -313,51 +319,101 @@ function demCiz() {
       uyduAktif = !uyduAktif;
       btn.innerText = uyduAktif ? "Uydu: AÇIK" : "Uydu: KAPALI";
       btn.style.background = uyduAktif ? "#059669" : "#475569";
-      demCiz();
+      demCiz(true);
     };
     bar.appendChild(btn);
   }
 
-  var c = document.getElementById("demCanvas");
-  var w = c.parentElement.clientWidth - 24;
-  if (w < 200) w = 320;
-  var h = 230;
-  c.width = w;
-  c.height = h;
-  var ctx = c.getContext("2d");
+  // Harita kapsayıcısı ve + / - Zoom Butonları
+  if (!document.getElementById("mapZoomBox")) {
+    parent.style.position = "relative";
+    var zBox = document.createElement("div");
+    zBox.id = "mapZoomBox";
+    zBox.style.cssText = "position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:6px;z-index:25;";
 
-  ctx.fillStyle = "#0b1120";
-  ctx.fillRect(0, 0, w, h);
+    var bIn = document.createElement("button");
+    bIn.type = "button";
+    bIn.innerText = "+";
+    bIn.style.cssText = "width:36px;height:36px;background:rgba(15,23,42,0.88);color:#fbbf24;border:1px solid #475569;border-radius:8px;font-size:20px;font-weight:800;cursor:pointer;";
+    bIn.onclick = function() {
+      if (uyduZoom < 19) { uyduZoom++; demCiz(true); }
+    };
+
+    var bOut = document.createElement("button");
+    bOut.type = "button";
+    bOut.innerText = "−";
+    bOut.style.cssText = "width:36px;height:36px;background:rgba(15,23,42,0.88);color:#fbbf24;border:1px solid #475569;border-radius:8px;font-size:20px;font-weight:800;cursor:pointer;";
+    bOut.onclick = function() {
+      if (uyduZoom > 13) { uyduZoom--; demCiz(true); }
+    };
+
+    zBox.appendChild(bIn);
+    zBox.appendChild(bOut);
+    parent.appendChild(zBox);
+  }
 
   var cLat = lat ? parseFloat(lat) : 38.3569;
   var cLon = lon ? parseFloat(lon) : 34.0240;
 
-  if (uyduAktif) {
-    var n = Math.pow(2, uyduZoom);
-    var latRad = cLat * Math.PI / 180;
-    var xFloat = (cLon + 180) / 360 * n;
-    var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-    var tileX = Math.floor(xFloat);
-    var tileY = Math.floor(yFloat);
-    var offX = (xFloat - tileX) * 256;
-    var offY = (yFloat - tileY) * 256;
-    var cx0 = w / 2;
-    var cy0 = h / 2;
+  // Konum 1 metreden az değiştiyse ve zoom değişmediyse gereksiz yeniden çizim yapma (Pır pır önleme)
+  if (!zorlaYenile && sonCizilenLat !== null && sonCizilenZoom === uyduZoom) {
+    var fark = Math.abs(cLat - sonCizilenLat) + Math.abs(cLon - sonCizilenLon);
+    if (fark < 0.00001) return;
+  }
+  sonCizilenLat = cLat;
+  sonCizilenLon = cLon;
+  sonCizilenZoom = uyduZoom;
 
-    var host = "https:" + "//" + "server" + "." + "arcgisonline" + "." + "com";
-    var path = "/ArcGIS/rest/services/World_Imagery/MapServer/tile/";
+  var w = parent.clientWidth - 24;
+  if (w < 200) w = 320;
+  var h = 235;
+  if (c.width !== w || c.height !== h) {
+    c.width = w;
+    c.height = h;
+  }
+  var ctx = c.getContext("2d");
 
-    for (var dx = -1; dx <= 1; dx++) {
-      for (var dy = -1; dy <= 1; dy++) {
-        (function(tx, ty, px, py) {
+  if (!uyduAktif) {
+    ctx.fillStyle = "#0b1120";
+    ctx.fillRect(0, 0, w, h);
+    katmanlariCiz(ctx, w, h, cLat, cLon);
+    return;
+  }
+
+  var n = Math.pow(2, uyduZoom);
+  var latRad = cLat * Math.PI / 180;
+  var xFloat = (cLon + 180) / 360 * n;
+  var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+  var tileX = Math.floor(xFloat);
+  var tileY = Math.floor(yFloat);
+  var offX = (xFloat - tileX) * 256;
+  var offY = (yFloat - tileY) * 256;
+  var cx0 = w / 2;
+  var cy0 = h / 2;
+
+  var host = "https:" + "//" + "server" + "." + "arcgisonline" + "." + "com";
+  var path = "/ArcGIS/rest/services/World_Imagery/MapServer/tile/";
+
+  for (var dx = -1; dx <= 1; dx++) {
+    for (var dy = -1; dy <= 1; dy++) {
+      var tx = tileX + dx;
+      var ty = tileY + dy;
+      var px = Math.round(cx0 - offX + dx * 256);
+      var py = Math.round(cy0 - offY + dy * 256);
+      var cacheKey = uyduZoom + "_" + tx + "_" + ty;
+
+      if (tileCache[cacheKey] && tileCache[cacheKey].complete) {
+        ctx.drawImage(tileCache[cacheKey], px, py, 256, 256);
+      } else if (!tileCache[cacheKey]) {
+        (function(k, x, y, posX, posY) {
           var img = new Image();
           img.crossOrigin = "anonymous";
+          tileCache[k] = img;
           img.onload = function() {
-            ctx.drawImage(img, px, py, 256, 256);
-            katmanlariCiz(ctx, w, h, cLat, cLon);
+            demCiz(true);
           };
-          img.src = host + path + uyduZoom + "/" + ty + "/" + tx;
-        })(tileX + dx, tileY + dy, Math.round(cx0 - offX + dx * 256), Math.round(cy0 - offY + dy * 256));
+          img.src = host + path + uyduZoom + "/" + y + "/" + x;
+        })(cacheKey, tx, ty, px, py);
       }
     }
   }
@@ -369,34 +425,33 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
   var cx = w / 2;
   var cy = h / 2;
 
-  // Zoom 18 için 1 piksel ≈ 0.47 metre (25m = 53px, 50m = 106px)
   var mPerPx = 156543.03 * Math.cos(cLat * Math.PI / 180) / Math.pow(2, uyduZoom);
-  var r25 = Math.round(25 / mPerPx);
-  var r50 = Math.round(50 / mPerPx);
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r25, 0, Math.PI * 2);
-  ctx.stroke();
+  // 10m, 20m, 30m, 40m, 50m Mesafe Halkaları
+  var mesafeler = new Array(10, 20, 30, 40, 50);
+  mesafeler.forEach(function(m) {
+    var rad = Math.round(m / mPerPx);
+    if (rad > 10 && rad < w) {
+      ctx.strokeStyle = (m === 50) ? "rgba(251, 191, 36, 0.75)" : "rgba(255, 255, 255, 0.45)";
+      ctx.lineWidth = (m === 50) ? 1.5 : 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(cx, cy, r50, 0, Math.PI * 2);
-  ctx.stroke();
+      ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
+      ctx.fillRect(cx + rad - 13, cy - 13, 26, 12);
+      ctx.fillStyle = (m === 50) ? "#fbbf24" : "#f1f5f9";
+      ctx.font = "bold 9px sans-serif";
+      ctx.fillText(m + "m", cx + rad - 10, cy - 4);
+    }
+  });
 
   ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
   ctx.moveTo(0, cy); ctx.lineTo(w, cy);
   ctx.stroke();
-
-  ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
-  ctx.fillRect(cx + r25 - 14, cy - 14, 28, 13);
-  ctx.fillRect(cx + r50 - 14, cy - 14, 28, 13);
-  ctx.fillStyle = "#fbbf24";
-  ctx.font = "bold 9px sans-serif";
-  ctx.fillText("25m", cx + r25 - 11, cy - 4);
-  ctx.fillText("50m", cx + r50 - 11, cy - 4);
 
   // Kayıtlı Sondaj Kuyuları (Mavi Nokta)
   var arr = okuListe();
@@ -431,9 +486,11 @@ function katmanlariCiz(ctx, w, h, cLat, cLon) {
   ctx.stroke();
 }
 
+
 if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
-else { demCiz(); }
+else { demCiz(true); }
 </script>
+
 
 
 
