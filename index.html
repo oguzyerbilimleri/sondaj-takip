@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zemin Etüt - Saha Sondaj Kayıt</title>
-    <link rel="stylesheet" href="https://cloudflare.com" />
-    <script src="https://cloudflare.com"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: #0f172a; color: #f1f5f9; padding-bottom: 60px; }
@@ -16,10 +14,10 @@
         main { max-width: 500px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
         .map-wrap { position: relative; height: 260px; width: 100%; border-radius: 8px; overflow: hidden; background: #0b1120; border: 1px solid #334155; margin-bottom: 10px; }
-        #map { width: 100%; height: 100%; z-index: 1; }
-        .key-bar { display: flex; gap: 6px; margin-bottom: 10px; }
-        .key-bar input { flex: 1; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
-        .key-bar button { background: #334155; color: #fbbf24; border: 1px solid #475569; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        #tileLayer { position: absolute; inset: 0; overflow: hidden; }
+        .pin-center { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(239,68,68,0.35); z-index: 10; pointer-events: none; }
+        .zoom-btns { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
+        .z-btn { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.88); color: #fbbf24; border: 1px solid #475569; border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; }
         .gps-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .gps-info { font-size: 13px; line-height: 1.7; color: #94a3b8; }
         .gps-val { color: #fbbf24; font-family: monospace; font-weight: 700; font-size: 14px; }
@@ -30,7 +28,7 @@
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .field { margin-bottom: 10px; }
         label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
-        input[type="text"], input[type="number"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
+        input { width: 100%; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; }
         #previewImg { display: none; width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #fbbf24; }
         .btn-save { width: 100%; background: #059669; color: #fff; border: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
         .rec-item { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; display: flex; gap: 10px; margin-bottom: 10px; }
@@ -52,12 +50,13 @@
 
     <main>
         <div class="card">
-            <div class="key-bar">
-                <input type="text" id="mtKeyInput" placeholder="MapTiler API Anahtarını buraya yapıştır...">
-                <button type="button" id="saveKeyBtn">Uyduyu Aç</button>
-            </div>
             <div class="map-wrap">
-                <div id="map"></div>
+                <div id="tileLayer"></div>
+                <div class="pin-center"></div>
+                <div class="zoom-btns">
+                    <button type="button" class="z-btn" id="zoomIn">+</button>
+                    <button type="button" class="z-btn" id="zoomOut">−</button>
+                </div>
             </div>
             <div class="gps-box">
                 <div class="gps-info">
@@ -112,46 +111,11 @@
 
     <canvas id="watermarkCanvas" style="display:none;"></canvas>
 
-    <!-- 1. BLOK: GPS VE HARİTA -->
+    <!-- 1. BLOK: SADECE GPS -->
     <script>
         var currentLat = null;
         var currentLon = null;
         var currentAcc = null;
-        var map = null;
-        var userMarker = null;
-        var satLayer = null;
-
-        function initMap() {
-            if (typeof L === 'undefined') return;
-            map = L.map('map').setView([38.3687, 34.0370], 13);
-            var savedKey = localStorage.getItem('maptiler_key') || '';
-            document.getElementById('mtKeyInput').value = savedKey;
-            applyMapTilerLayer(savedKey);
-            setTimeout(function() { map.invalidateSize(); }, 400);
-        }
-
-        function applyMapTilerLayer(key) {
-            if (!map) return;
-            if (satLayer) {
-                map.removeLayer(satLayer);
-            }
-            if (key && key.trim().length > 5) {
-                var proto = window.location.protocol + "//";
-                var url = proto + "://maptiler.com{z}/{x}/{y}.jpg?key=" + key.trim();
-                satLayer = L.tileLayer(url, { maxZoom: 20, attribution: 'MapTiler' }).addTo(map);
-            }
-        }
-
-        document.getElementById('saveKeyBtn').addEventListener('click', function() {
-            var k = document.getElementById('mtKeyInput').value.trim();
-            if (!k) {
-                alert("Lütfen MapTiler API anahtarınızı yapıştırın.");
-                return;
-            }
-            localStorage.setItem('maptiler_key', k);
-            applyMapTilerLayer(k);
-            alert("MapTiler Uydu Katmanı kaydedildi ve aktif edildi!");
-        });
 
         function ekranaKonumYaz(pos) {
             currentLat = pos.coords.latitude.toFixed(6);
@@ -166,14 +130,8 @@
             statusEl.innerText = "● Konum alındı (" + new Date().toLocaleTimeString('tr-TR') + ")";
             statusEl.style.color = "#34d399";
 
-            if (map) {
-                var ll = [parseFloat(currentLat), parseFloat(currentLon)];
-                map.setView(ll, 18);
-                if (userMarker) {
-                    userMarker.setLatLng(ll);
-                } else {
-                    userMarker = L.circleMarker(ll, { radius: 8, color: '#ffffff', fillColor: '#ef4444', fillOpacity: 1, weight: 2 }).addTo(map);
-                }
+            if (typeof mapTilerCiz === "function") {
+                mapTilerCiz(parseFloat(currentLat), parseFloat(currentLon), mapZoom);
             }
         }
 
@@ -185,31 +143,92 @@
                 return;
             }
             statusEl.innerText = "Konum sorgulanıyor...";
-statusEl.style.color = "#fbbf24";
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function() {},
-{ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-);
-navigator.geolocation.getCurrentPosition(
-ekranaKonumYaz,
-function(err) {
-if (!currentLat) {
-statusEl.innerText = "Hata (" + err.code + "): " + err.message;
-statusEl.style.color = "#f87171";
+            statusEl.style.color = "#fbbf24";
+
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function() {},
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+            );
+
+            navigator.geolocation.getCurrentPosition(
+                ekranaKonumYaz,
+                function(err) {
+                    if (!currentLat) {
+                        statusEl.innerText = "Hata (" + err.code + "): " + err.message;
+                        statusEl.style.color = "#f87171";
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
+        }
+
+        document.getElementById('gpsBtn').addEventListener('click', konumAl);
+        konumAl();
+    </script>
+
+    <!-- 2. BLOK: MAPTILER UYDU -->
+    <script>
+        var mapZoom = 17;
+        var mtKey = "LLZMhjAwzMdIqcazuDtw";
+
+        function mapTilerCiz(lat, lon, zoom) {
+            var box = document.getElementById('tileLayer');
+            var w = box.clientWidth || 360;
+            var h = box.clientHeight || 260;
+            box.innerHTML = "";
+
+            var n = Math.pow(2, zoom);
+            var latRad = lat * Math.PI / 180;
+            var xFloat = (lon + 180) / 360 * n;
+            var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+
+            var tileX = Math.floor(xFloat);
+            var tileY = Math.floor(yFloat);
+            var offX = (xFloat - tileX) * 256;
+            var offY = (yFloat - tileY) * 256;
+
+            var cx = w / 2;
+            var cy = h / 2;
+
+            for (var dx = -1; dx <= 1; dx++) {
+for (var dy = -1; dy <= 1; dy++) {
+var img = document.createElement('img');
+var tx = tileX + dx;
+var ty = tileY + dy;
+var u = new URL(window.location.href);
+u.protocol = "https:";
+u.hostname = "maptiler.com";
+u.pathname = "/maps/hybrid/256/" + zoom + "/" + tx + "/" + ty + ".jpg";
+u.search = "?key=" + mtKey;
+img.src = u.toString();
+img.style.position = "absolute";
+img.style.width = "256px";
+img.style.height = "256px";
+img.style.left = Math.round(cx - offX + dx * 256) + "px";
+img.style.top = Math.round(cy - offY + dy * 256) + "px";
+box.appendChild(img);
 }
-},
-{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-);
 }
-initMap();
-document.getElementById('gpsBtn').addEventListener('click', konumAl);
-konumAl();
+}
+document.getElementById('zoomIn').addEventListener('click', function() {
+if (mapZoom < 20) {
+mapZoom++;
+mapTilerCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+}
+});
+document.getElementById('zoomOut').addEventListener('click', function() {
+if (mapZoom > 10) {
+mapZoom--;
+mapTilerCiz(currentLat ? parseFloat(currentLat) : 38.3687, currentLon ? parseFloat(currentLon) : 34.0370, mapZoom);
+}
+});
+mapTilerCiz(38.3687, 34.0370, 13);
 var db = null;
 var processedPhotoDataUrl = null;
-var allRecordsCache = [];
+var allRecordsCache = new Array();
 document.getElementById('photoInput').addEventListener('change', function(e) {
-var file = e.target.files[0];
+var file = e.target.files.item(0);
 if (!file) return;
 var reader = new FileReader();
 reader.onload = function(event) {
@@ -264,10 +283,6 @@ if (!currentLat) {
 alert("Önce 'Konum Al' butonuna basarak koordinat alın.");
 return;
 }
-if (!db) {
-alert("Veritabanı hazır değil, sayfayı yenileyip tekrar deneyin.");
-return;
-}
 var record = {
 parcel: document.getElementById('parcel').value,
 skNo: document.getElementById('skNo').value,
@@ -287,7 +302,7 @@ document.getElementById('boreholeForm').reset();
 document.getElementById('previewImg').style.display = "none";
 processedPhotoDataUrl = null;
 renderRecords();
-alert("Sondaj başarıyla kaydedildi!");
+alert("Sondaj kaydedildi!");
 };
 });
 function renderRecords() {
@@ -323,7 +338,7 @@ tx.objectStore("sondajlar").delete(id);
 tx.oncomplete = renderRecords;
 }
 function downloadByIdx(idx) {
-var r = allRecordsCache[idx];
+var r = allRecordsCache.at(idx);
 if (!r || !r.photo) return;
 var a = document.createElement('a');
 a.href = r.photo;
