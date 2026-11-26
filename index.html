@@ -336,7 +336,7 @@ function demCiz(zorlaYenile) {
     bIn.innerText = "+";
     bIn.style.cssText = "width:36px;height:36px;background:rgba(15,23,42,0.88);color:#fbbf24;border:1px solid #475569;border-radius:8px;font-size:20px;font-weight:800;cursor:pointer;";
     bIn.onclick = function() {
-      if (uyduZoom < 19) { uyduZoom++; demCiz(true); }
+      if (uyduZoom < 20) { uyduZoom++; demCiz(true); }
     };
 
     var bOut = document.createElement("button");
@@ -355,7 +355,6 @@ function demCiz(zorlaYenile) {
   var cLat = lat ? parseFloat(lat) : 38.3569;
   var cLon = lon ? parseFloat(lon) : 34.0240;
 
-  // Konum 1 metreden az değiştiyse ve zoom değişmediyse gereksiz yeniden çizim yapma (Pır pır önleme)
   if (!zorlaYenile && sonCizilenLat !== null && sonCizilenZoom === uyduZoom) {
     var fark = Math.abs(cLat - sonCizilenLat) + Math.abs(cLon - sonCizilenLon);
     if (fark < 0.00001) return;
@@ -380,14 +379,20 @@ function demCiz(zorlaYenile) {
     return;
   }
 
-  var n = Math.pow(2, uyduZoom);
+  // Sunucudan en fazla Zoom 17/18 çek, daha üst zoomlarda (18-20) görüntüyü dijital büyüt (Overzoom)
+  var maxNativeZoom = 17;
+  var fetchZoom = uyduZoom > maxNativeZoom ? maxNativeZoom : uyduZoom;
+  var scale = Math.pow(2, uyduZoom - fetchZoom);
+  var tileDrawSize = 256 * scale;
+
+  var n = Math.pow(2, fetchZoom);
   var latRad = cLat * Math.PI / 180;
   var xFloat = (cLon + 180) / 360 * n;
   var yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
   var tileX = Math.floor(xFloat);
   var tileY = Math.floor(yFloat);
-  var offX = (xFloat - tileX) * 256;
-  var offY = (yFloat - tileY) * 256;
+  var offX = (xFloat - tileX) * tileDrawSize;
+  var offY = (yFloat - tileY) * tileDrawSize;
   var cx0 = w / 2;
   var cy0 = h / 2;
 
@@ -398,22 +403,22 @@ function demCiz(zorlaYenile) {
     for (var dy = -1; dy <= 1; dy++) {
       var tx = tileX + dx;
       var ty = tileY + dy;
-      var px = Math.round(cx0 - offX + dx * 256);
-      var py = Math.round(cy0 - offY + dy * 256);
-      var cacheKey = uyduZoom + "_" + tx + "_" + ty;
+      var px = Math.round(cx0 - offX + dx * tileDrawSize);
+      var py = Math.round(cy0 - offY + dy * tileDrawSize);
+      var cacheKey = fetchZoom + "_" + tx + "_" + ty;
 
       if (tileCache[cacheKey] && tileCache[cacheKey].complete) {
-        ctx.drawImage(tileCache[cacheKey], px, py, 256, 256);
+        ctx.drawImage(tileCache[cacheKey], px, py, tileDrawSize, tileDrawSize);
       } else if (!tileCache[cacheKey]) {
-        (function(k, x, y, posX, posY) {
+        (function(k, x, y) {
           var img = new Image();
           img.crossOrigin = "anonymous";
           tileCache[k] = img;
           img.onload = function() {
             demCiz(true);
           };
-          img.src = host + path + uyduZoom + "/" + y + "/" + x;
-        })(cacheKey, tx, ty, px, py);
+          img.src = host + path + fetchZoom + "/" + y + "/" + x;
+        })(cacheKey, tx, ty);
       }
     }
   }
