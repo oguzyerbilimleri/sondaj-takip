@@ -227,141 +227,147 @@ ciz();
 var hgtView = null, hgtSize = 0, hgtBaseLat = 0, hgtBaseLon = 0, loadedTileName = "";
 
 function hgtGuncelle(la, lo) {
-  try {
-    var bLat = Math.floor(la);
-    var bLon = Math.floor(lo);
-    var latPrefix = bLat >= 0 ? "N" : "S";
-    var lonPrefix = bLon >= 0 ? "E" : "W";
-    var latStr = String(Math.abs(bLat)).padStart(2, "0");
-    var lonStr = String(Math.abs(bLon)).padStart(3, "0");
-    var fileName = latPrefix + latStr + lonPrefix + lonStr + ".hgt";
+  var st = document.getElementById("hgtSt");
+  var bLat = Math.floor(la);
+  var bLon = Math.floor(lo);
+  var latStr = (bLat < 10 ? "0" : "") + Math.abs(bLat);
+  var lonStr = (bLon < 100 ? (bLon < 10 ? "00" : "0") : "") + Math.abs(bLon);
+  var fileName = (bLat >= 0 ? "N" : "S") + latStr + (bLon >= 0 ? "E" : "W") + lonStr + ".hgt";
 
-    if (loadedTileName === fileName && hgtView) {
-      var z = hgtKotOku(la, lo);
-if (z !== null) {
-kot = z + " m";
-document.getElementById("altV").innerText = kot;
+  if (loadedTileName === fileName && hgtView) {
+    var z = hgtKotOku(la, lo);
+    if (z !== null) {
+      kot = z + " m";
+      document.getElementById("altV").innerText = kot;
+    }
+    demCiz();
+    return;
+  }
+
+  loadedTileName = fileName;
+  st.innerText = "DEM Aranıyor: " + fileName + "...";
+
+  fetch(fileName).then(function(res) {
+    if (!res.ok) throw new Error("yok");
+    return res.arrayBuffer();
+  }).then(function(buf) {
+    hgtBaseLat = bLat;
+    hgtBaseLon = bLon;
+    hgtSize = Math.round(Math.sqrt(buf.byteLength / 2));
+    hgtView = new DataView(buf);
+    st.innerText = "✓ Aktif DEM: " + fileName;
+    st.style.color = "#34d399";
+    var z2 = hgtKotOku(la, lo);
+    if (z2 !== null) {
+      kot = z2 + " m";
+      document.getElementById("altV").innerText = kot;
+    }
+    demCiz();
+  }).catch(function() {
+    loadedTileName = "";
+    st.innerText = "Depoda " + fileName + " yok (Konum haritası aktif)";
+    st.style.color = "#94a3b8";
+    demCiz();
+  });
 }
-demCiz();
-return;
-}
-loadedTileName = fileName;
-document.getElementById("hgtSt").innerText = "Aranıyor: " + fileName + "...";
-fetch(fileName)
-.then(function(res) {
-if (!res.ok) throw new Error("yok");
-return res.arrayBuffer();
-})
-.then(function(buf) {
-hgtBaseLat = bLat;
-hgtBaseLon = bLon;
-var totalSamples = buf.byteLength / 2;
-hgtSize = Math.round(Math.sqrt(totalSamples));
-hgtView = new DataView(buf);
-document.getElementById("hgtSt").innerText = "✓ Aktif DEM: " + fileName;
-document.getElementById("hgtSt").style.color = "#34d399";
-var z2 = hgtKotOku(la, lo);
-if (z2 !== null) {
-kot = z2 + " m";
-document.getElementById("altV").innerText = kot;
-}
-demCiz();
-})
-.catch(function() {
-loadedTileName = "";
-document.getElementById("hgtSt").innerText = "Depoda " + fileName + " yok (GPS kotu aktif)";
-document.getElementById("hgtSt").style.color = "#94a3b8";
-demCiz();
-});
-} catch (e) {}
-}
+
 function hgtKotOku(la, lo) {
-if (!hgtView || !hgtSize) return null;
-var dLat = la - hgtBaseLat;
-var dLon = lo - hgtBaseLon;
-if (dLat < 0 || dLat > 1 || dLon < 0 || dLon > 1) return null;
-var row = Math.round((1 - dLat) * (hgtSize - 1));
-var col = Math.round(dLon * (hgtSize - 1));
-var idx = (row * hgtSize + col) * 2;
-if (idx < 0 || idx + 1 >= hgtView.byteLength) return null;
-var val = hgtView.getInt16(idx, false);
-return val < -1000 ? null : val;
+  if (!hgtView || !hgtSize) return null;
+  var dLat = la - hgtBaseLat;
+  var dLon = lo - hgtBaseLon;
+  if (dLat < 0 || dLat > 1 || dLon < 0 || dLon > 1) return null;
+  var row = Math.round((1 - dLat) * (hgtSize - 1));
+  var col = Math.round(dLon * (hgtSize - 1));
+  var idx = (row * hgtSize + col) * 2;
+  if (idx < 0 || idx + 1 >= hgtView.byteLength) return null;
+  var val = hgtView.getInt16(idx, false);
+  return val < -1000 ? null : val;
 }
+
 function demCiz() {
-try {
-var c = document.getElementById("demCanvas");
-var w = c.parentElement.clientWidth - 24;
-if (w < 200) w = 320;
-c.width = w; c.height = 190;
-var ctx = c.getContext("2d");
-ctx.fillStyle = "#090d16";
-ctx.fillRect(0, 0, w, 190);
-if (hgtView && lat && lon) {
-var cLat = parseFloat(lat), cLon = parseFloat(lon);
-var span = 0.015;
-var step = 4;
-var minZ = 9999, maxZ = -9999;
-var grid = new Array();
-for (var py = 0; py < 190; py += step) {
-for (var px = 0; px < w; px += step) {
-var gLat = cLat + (0.5 - py / 190) * span;
-var gLon = cLon + (px / w - 0.5) * span;
-var z = hgtKotOku(gLat, gLon);
-if (z !== null) {
-if (z < minZ) minZ = z;
-if (z > maxZ) maxZ = z;
+  var c = document.getElementById("demCanvas");
+  var w = c.parentElement.clientWidth - 24;
+  if (w < 200) w = 320;
+  c.width = w;
+  c.height = 190;
+  var ctx = c.getContext("2d");
+  ctx.fillStyle = "#0b1120";
+  ctx.fillRect(0, 0, w, 190);
+
+  if (hgtView && lat && lon) {
+    var cLat = parseFloat(lat), cLon = parseFloat(lon);
+    var span = 0.015;
+    var step = 4;
+    var minZ = 9999, maxZ = -9999;
+    var grid = new Array();
+
+    for (var py = 0; py < 190; py += step) {
+      for (var px = 0; px < w; px += step) {
+        var gLat = cLat + (0.5 - py / 190) * span;
+        var gLon = cLon + (px / w - 0.5) * span;
+        var z = hgtKotOku(gLat, gLon);
+        if (z !== null) {
+          if (z < minZ) minZ = z;
+          if (z > maxZ) maxZ = z;
+        }
+        grid.push({ px: px, py: py, z: z });
+      }
+    }
+
+    var diff = (maxZ - minZ) || 1;
+    grid.forEach(function(cell) {
+      if (cell.z !== null) {
+        var ratio = (cell.z - minZ) / diff;
+        var r = Math.round(30 + ratio * 180);
+        var g = Math.round(90 + (1 - Math.abs(ratio - 0.5)) * 110);
+        var b = Math.round(50 + (1 - ratio) * 90);
+        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+        ctx.fillRect(cell.px, cell.py, step, step);
+      }
+    });
+
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(6, 6, 155, 22);
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "bold 11px monospace";
+    ctx.fillText("Kot: " + minZ + "m - " + maxZ + "m", 12, 20);
+  } else {
+    ctx.strokeStyle = "#334155";
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, 190);
+    ctx.moveTo(0, 95); ctx.lineTo(w, 95);
+    ctx.stroke();
+  }
+
+  var arr = okuListe();
+  if (lat && lon && arr.length) {
+    var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
+    var span2 = 0.015;
+    arr.forEach(function(item) {
+      var sx = ((parseFloat(item.lon) - cLon2) / span2 + 0.5) * w;
+      var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * 190;
+      if (sx >= 0 && sx <= w && sy >= 0 && sy <= 190) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 10px sans-serif";
+        ctx.fillText(item.s, sx + 7, sy + 3);
+      }
+    });
+  }
+
+  ctx.beginPath();
+  ctx.arc(w / 2, 95, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
 }
-grid.push({ px: px, py: py, z: z });
-}
-}
-var diff = (maxZ - minZ) || 1;
-grid.forEach(function(cell) {
-if (cell.z !== null) {
-var ratio = (cell.z - minZ) / diff;
-var r = Math.round(30 + ratio * 180);
-var g = Math.round(90 + (1 - Math.abs(ratio - 0.5)) * 110);
-var b = Math.round(50 + (1 - ratio) * 90);
-ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
-ctx.fillRect(cell.px, cell.py, step, step);
-}
-});
-ctx.fillStyle = "rgba(0,0,0,0.65)";
-ctx.fillRect(6, 6, 155, 22);
-ctx.fillStyle = "#fbbf24";
-ctx.font = "bold 11px monospace";
-ctx.fillText("Kot: " + minZ + "m - " + maxZ + "m", 12, 20);
-} else {
-ctx.strokeStyle = "#1e293b";
-ctx.beginPath();
-ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, 190);
-ctx.moveTo(0, 95); ctx.lineTo(w, 95);
-ctx.stroke();
-}
-var arr = okuListe();
-if (lat && lon && arr.length) {
-var cLat2 = parseFloat(lat), cLon2 = parseFloat(lon);
-var span2 = 0.015;
-arr.forEach(function(item) {
-var sx = ((parseFloat(item.lon) - cLon2) / span2 + 0.5) * w;
-var sy = (0.5 - (parseFloat(item.lat) - cLat2) / span2) * 190;
-if (sx >= 0 && sx <= w && sy >= 0 && sy <= 190) {
-ctx.beginPath();
-ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-ctx.fillStyle = "#38bdf8";
-ctx.fill();
-ctx.fillStyle = "#ffffff";
-ctx.font = "bold 10px sans-serif";
-ctx.fillText(item.s, sx + 7, sy + 3);
-}
-});
-}
-ctx.beginPath();
-ctx.arc(w / 2, 95, 6, 0, Math.PI * 2);
-ctx.fillStyle = "#ef4444";
-ctx.fill();
-ctx.lineWidth = 2;
-ctx.strokeStyle = "#ffffff";
-ctx.stroke();
-} catch (e) {}
-}
-demCiz();
+
+if (lat && lon) { hgtGuncelle(parseFloat(lat), parseFloat(lon)); }
+else { demCiz(); }
+</script>
+
