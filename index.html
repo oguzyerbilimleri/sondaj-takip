@@ -229,15 +229,51 @@ function indir(id) {
 function csvIndir() {
   var arr = okuListe();
   if (!arr.length) { alert("Kayıt yok"); return; }
-  var csv = "\uFEFFParsel;Sondaj;Enlem;Boylam;Kot;Hassasiyet;Derinlik;YAS;Not;Tarih\n";
+
+  var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://w3.org">' +
+    '<head><meta charset="UTF-8"><style>' +
+    'table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }' +
+    'th { background-color: #f59e0b; color: #000000; font-weight: bold; border: 1px solid #334155; padding: 8px 14px; white-space: nowrap; }' +
+    'td { border: 1px solid #94a3b8; padding: 6px 14px; white-space: nowrap; mso-number-format:"\\@"; }' +
+    '</style></head><body><table><thead><tr>' +
+    '<th>Ada / Parsel</th>' +
+    '<th>Sondaj No</th>' +
+    '<th>Enlem (Lat)</th>' +
+    '<th>Boylam (Lon)</th>' +
+    '<th>Kot (Rakım)</th>' +
+    '<th>Hassasiyet</th>' +
+    '<th>Derinlik (m)</th>' +
+    '<th>YAS (m)</th>' +
+    '<th>Saha Notu</th>' +
+    '<th>Tarih / Saat</th>' +
+    '</tr></thead><tbody>';
+
   arr.forEach(function(x) {
-    csv += x.p + ";" + x.s + ";" + x.lat + ";" + x.lon + ";" + (x.kot || "-") + ";" + x.acc + ";" + x.d + ";" + x.w + ";" + x.n + ";" + x.t + "\n";
+    var derStr = x.d ? (x.d + " m") : "-";
+    var yasStr = x.w ? (x.w + " m") : "-";
+    html += '<tr>' +
+      '<td>' + (x.p || "-") + '</td>' +
+      '<td>' + (x.s || "-") + '</td>' +
+      '<td>' + (x.lat || "-") + '</td>' +
+      '<td>' + (x.lon || "-") + '</td>' +
+      '<td>' + (x.kot || "-") + '</td>' +
+      '<td>' + (x.acc || "-") + '</td>' +
+      '<td>' + derStr + '</td>' +
+      '<td>' + yasStr + '</td>' +
+      '<td>' + (x.n || "-") + '</td>' +
+      '<td>' + (x.t || "-") + '</td>' +
+      '</tr>';
   });
+
+  html += '</tbody></table></body></html>';
+
+  var blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-  a.download = "Sondajlar.csv";
+  a.href = URL.createObjectURL(blob);
+  a.download = "Sondaj_Listesi_" + new Date().toISOString().slice(0, 10) + ".xls";
   a.click();
 }
+
 ciz();
 </script>
 
