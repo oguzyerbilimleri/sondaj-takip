@@ -380,7 +380,7 @@ function demCiz(zorlaYenile) {
   }
 
   // Sunucudan en fazla Zoom 17/18 çek, daha üst zoomlarda (18-20) görüntüyü dijital büyüt (Overzoom)
-  var maxNativeZoom = 17;
+  var maxNativeZoom = 16;
   var fetchZoom = uyduZoom > maxNativeZoom ? maxNativeZoom : uyduZoom;
   var scale = Math.pow(2, uyduZoom - fetchZoom);
   var tileDrawSize = 256 * scale;
