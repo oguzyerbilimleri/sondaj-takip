@@ -70,9 +70,10 @@ Hassasiyet: <b id="accV" style="color:#34d399">-</b><br>
 <div id="list"></div>
 <canvas id="cvs" style="display:none"></canvas>
 
-<!-- 1. BAĞIMSIZ BLOK: ÇALIŞAN GPS, FOTOĞRAF VE KAYIT SİSTEMİ -->
+<!-- 1. BAĞIMSIZ BLOK: ÇALIŞAN GPS, FOTOĞRAF VE MÜHÜRLÜ KAYIT SİSTEMİ -->
 <script>
 var lat = "", lon = "", acc = "", kot = "-", fotoData = "";
+var fotoLat = "", fotoLon = "", fotoAcc = "", fotoKot = "";
 var KEY = "sondaj_db_final";
 var watchId = null;
 
@@ -110,6 +111,13 @@ konumAl();
 
 function fotoIsle(el) {
   if (!el.files || !el.files.length) return;
+
+  // Fotoğraf seçildiği/çekildiği saniyedeki koordinatı mühürle
+  fotoLat = lat;
+  fotoLon = lon;
+  fotoAcc = acc;
+  fotoKot = kot;
+
   var r = new FileReader();
   r.onload = function(ev) {
     var img = new Image();
@@ -126,9 +134,9 @@ function fotoIsle(el) {
       ctx.font = "bold 13px sans-serif";
       var p = document.getElementById("pIn").value || "-";
       var s = document.getElementById("sIn").value || "-";
-      ctx.fillText("Parsel: " + p + " | " + s + " | Kot: " + kot + " | " + new Date().toLocaleString("tr-TR"), 10, h - 32);
+      ctx.fillText("Parsel: " + p + " | " + s + " | Kot: " + (fotoKot || "-") + " | " + new Date().toLocaleString("tr-TR"), 10, h - 32);
       ctx.fillStyle = "#ffffff";
-      ctx.fillText("Koordinat: " + (lat || "-") + ", " + (lon || "-") + " (" + (acc || "-") + ")", 10, h - 12);
+      ctx.fillText("Koordinat: " + (fotoLat || "-") + ", " + (fotoLon || "-") + " (" + (fotoAcc || "-") + ")", 10, h - 12);
       fotoData = c.toDataURL("image/jpeg", 0.65);
       var pr = document.getElementById("prev");
       pr.src = fotoData;
@@ -143,18 +151,27 @@ function kaydet() {
   var p = document.getElementById("pIn").value.trim();
   var s = document.getElementById("sIn").value.trim();
   if (!p || !s) { alert("Ada/Parsel ve Sondaj No girin."); return; }
-  if (!lat) { alert("Önce Konum Al butonuna basın."); return; }
+
+  // Fotoğraf varsa fotoğrafa basılan mühürlü koordinatı kullan, yoksa anlık koordinatı al
+  var kayitLat = (fotoData && fotoLat) ? fotoLat : lat;
+  var kayitLon = (fotoData && fotoLon) ? fotoLon : lon;
+  var kayitAcc = (fotoData && fotoAcc) ? fotoAcc : acc;
+  var kayitKot = (fotoData && fotoKot) ? fotoKot : kot;
+
+  if (!kayitLat) { alert("Önce Konum Al butonuna basın."); return; }
+
   var arr = okuListe();
   arr.unshift({
     id: Date.now(), p: p, s: s,
     d: document.getElementById("dIn").value,
     w: document.getElementById("wIn").value,
     n: document.getElementById("nIn").value,
-    lat: lat, lon: lon, kot: kot, acc: acc,
+    lat: kayitLat, lon: kayitLon, kot: kayitKot, acc: kayitAcc,
     t: new Date().toLocaleString("tr-TR"),
     f: fotoData
   });
   localStorage.setItem(KEY, JSON.stringify(arr));
+
   document.getElementById("pIn").value = "";
   document.getElementById("sIn").value = "";
   document.getElementById("dIn").value = "";
@@ -163,8 +180,10 @@ function kaydet() {
   document.getElementById("fIn").value = "";
   document.getElementById("prev").style.display = "none";
   fotoData = "";
+  fotoLat = ""; fotoLon = ""; fotoAcc = ""; fotoKot = "";
+
   ciz();
-  if (typeof demCiz === "function") { demCiz(); }
+  if (typeof demCiz === "function") { demCiz(true); }
   alert("Kaydedildi!");
 }
 
@@ -192,7 +211,7 @@ function sil(id) {
   var arr = okuListe().filter(function(x) { return x.id !== id; });
   localStorage.setItem(KEY, JSON.stringify(arr));
   ciz();
-  if (typeof demCiz === "function") { demCiz(); }
+  if (typeof demCiz === "function") { demCiz(true); }
 }
 
 function indir(id) {
@@ -221,6 +240,7 @@ function csvIndir() {
 }
 ciz();
 </script>
+
 
 <!-- 2. BAĞIMSIZ BLOK: NET UYDU + KML ODAKLAMA + ZOOM + .HGT KOT -->
 <script>
@@ -544,8 +564,8 @@ ctx.stroke();
 });
 }
 // Kullanıcının Gerçek Konumu (Kırmızı Nokta + 10m-50m Halkaları)
-var uLat = lat ? parseFloat(lat) : cLat;
-var uLon = lon ? parseFloat(lon) : cLon;
+  var uLat = cLat;
+  var uLon = cLon;
 var uX = cx + (((uLon - cLon) * 111320 * Math.cos(cLat * Math.PI / 180)) / mPerPx);
 var uY = cy - (((uLat - cLat) * 111132) / mPerPx);
 var mesafeler = new Array(10, 20, 30, 40, 50);
